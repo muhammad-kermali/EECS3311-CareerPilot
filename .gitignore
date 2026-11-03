@@ -1,0 +1,21 @@
+# Local secrets (never commit real keys)
+.env
+.env.*
+!.env.example
+config.local.json
+
+# Local data created by the app
+workspace/
+exports/
+*.log
+
+# Build output
+target/
+*.class
+
+# OS / IDE
+.DS_Store
+__MACOSX/
+.idea/
+*.iml
+.vscode/
