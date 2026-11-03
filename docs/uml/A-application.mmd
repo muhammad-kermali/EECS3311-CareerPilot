@@ -1,0 +1,108 @@
+classDiagram
+direction TB
+class CareerGUI {
+  +submit(FeatureRequest) FeatureResult
+  +launch(CareerAssistantFacade, boolean)$
+}
+class CareerCLI {
+  +submit(FeatureRequest) FeatureResult
+  +run(String[]) int
+}
+class CareerAssistantFacade {
+  <<Facade>>
+  -ServiceSet services
+  +execute(FeatureRequest) FeatureResult
+}
+class FeatureRequest {
+  +operation() Operation
+  +with(String, Object) FeatureRequest
+}
+class FeatureResult {
+  +status ResultStatus
+  +payload Object
+  +warnings List~String~
+  +error String
+}
+class AppFactory {
+  +create(AppConfig)$ CareerAssistantFacade
+  +create(WorkspaceRepository, LLMClient, Clock)$ CareerAssistantFacade
+}
+class ProfileService {
+  +importResume(Path) ProfilePreview
+  +confirmImport(ProfilePreview) CandidateProfile
+  +getProfile(String) CandidateProfile
+  +updateProfile(CandidateProfile) CandidateProfile
+}
+class JobService {
+  +analyzeJob(text, company, url, deadline) JobPreview
+  +saveJob(JobPosting) JobPosting
+}
+class AnalysisService {
+  +analyzeFit(profileId, jobId) FitReport
+  +currentFit(profileId, jobId) Optional~FitReport~
+  +identifyGaps(profileId, jobId) GapReport
+}
+class DocumentService {
+  +tailorResume(profileId, jobId) Resume
+  +draftLetter(profileId, jobId, tone, motivation) CoverLetter
+  +saveDraft(Document) Document
+  +inspectDocuments(profileId, jobId) DocumentStatus
+}
+class InterviewService {
+  +generateQuestions(profileId, jobId, count, focus) QuestionSet
+  +startInterview(questionSetId) InterviewSession
+  +submitAnswer(sessionId, answer) AnswerOutcome
+  +retryFeedback(sessionId) AnswerOutcome
+}
+class ApplicationService {
+  +updateApplication(jobId, ApplicationChanges, Integer) ApplicationRecord
+  +listApplications(status, overdueOnly) List~ApplicationView~
+}
+class PlanService {
+  +prepareApplication(profileId, jobId, Constraints) PreparationPreview
+  +savePlan(PreparationPlan, Constraints) PreparationPlan
+}
+class ExportService {
+  +exportPackage(Selection, format, Path) ExportResult
+}
+class EvidenceValidator {
+  +readEvidence(JsonNode, CandidateProfile) Checked
+  +unsupportedNumbers(claim, evidence, profile) Set~String~
+}
+class PlanValidator {
+  +validate(PreparationPlan, Constraints) ValidationResult
+}
+class WorkspaceRepository {
+  <<interface>>
+  +load(Class, id) T
+  +save(T, int) T
+  +saveBatch(List) List
+  +list(Class, Predicate) List
+}
+class JsonWorkspaceRepository
+CareerGUI --> CareerAssistantFacade
+CareerCLI --> CareerAssistantFacade
+CareerAssistantFacade ..> FeatureRequest
+CareerAssistantFacade ..> FeatureResult
+AppFactory ..> CareerAssistantFacade : creates
+CareerAssistantFacade --> ProfileService
+CareerAssistantFacade --> JobService
+CareerAssistantFacade --> AnalysisService
+CareerAssistantFacade --> DocumentService
+CareerAssistantFacade --> InterviewService
+CareerAssistantFacade --> ApplicationService
+CareerAssistantFacade --> PlanService
+CareerAssistantFacade --> ExportService
+AnalysisService --> EvidenceValidator
+DocumentService --> EvidenceValidator
+DocumentService --> AnalysisService
+PlanService --> PlanValidator
+WorkspaceRepository <|.. JsonWorkspaceRepository
+ProfileService --> WorkspaceRepository
+JobService --> WorkspaceRepository
+AnalysisService --> WorkspaceRepository
+DocumentService --> WorkspaceRepository
+InterviewService --> WorkspaceRepository
+ApplicationService --> WorkspaceRepository
+PlanService --> WorkspaceRepository
+ExportService --> WorkspaceRepository

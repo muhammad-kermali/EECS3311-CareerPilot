@@ -1,0 +1,25 @@
+Jordan Lee
+Toronto, ON | jordan.lee@example.com | 416-555-0142
+
+SUMMARY
+Computer science student who builds reliable web applications and enjoys working with data.
+
+EDUCATION
+Bachelor of Science in Computer Science, York University, Sep 2022 - Present
+
+EXPERIENCE
+Software Developer Intern, Maple Leaf Logistics, May 2025 - Aug 2025
+- Built a Java Spring Boot REST API for shipment tracking used by 3 internal teams
+- Wrote JUnit tests that raised code coverage from 55% to 80%
+- Reduced report generation time by 40% by rewriting slow SQL queries
+
+Teaching Assistant, York University, Sep 2024 - Apr 2025
+- Led weekly labs for 30 students in an introductory programming course
+- Explained object-oriented design and debugging techniques
+
+PROJECTS
+- StudyBuddy: a React and Node.js app for planning study sessions, deployed on AWS
+- Built a Python script that cleans and charts CSV data with pandas
+
+SKILLS
+Java, Python, SQL, JavaScript, React, Node.js, Spring Boot, JUnit, Git, AWS

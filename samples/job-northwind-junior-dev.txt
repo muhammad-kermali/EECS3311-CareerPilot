@@ -1,0 +1,22 @@
+Junior Software Developer - Northwind Analytics (Toronto, hybrid)
+
+About the role
+Northwind Analytics builds dashboards that help retailers understand their sales. You will join a small team that ships features every two weeks.
+
+What you will do
+- Build and maintain REST APIs in Java and Spring Boot
+- Write automated tests and take part in code reviews
+- Work with product managers to turn requirements into features
+
+What we are looking for
+- Experience building REST APIs with Java
+- Solid understanding of SQL and relational databases
+- Experience writing unit tests (JUnit or similar)
+- Familiarity with Git and collaborative development
+- Strong communication skills and the ability to explain technical ideas
+
+Nice to have
+- Experience with Docker or Kubernetes is an asset
+- Exposure to cloud platforms such as AWS is a bonus
+
+Apply by November 30, 2026.

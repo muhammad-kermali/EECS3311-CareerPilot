@@ -1,0 +1,104 @@
+classDiagram
+direction TB
+class Entity {
+  <<abstract>>
+  -String id
+  -int revision
+  -Instant createdAt
+  -Instant updatedAt
+  +idPrefix()* String
+}
+class Document {
+  <<abstract>>
+  -boolean reviewed
+  -Map sourceRevisions
+}
+class ResumePrototype {
+  <<interface / Prototype>>
+  +deepCopy() Resume
+}
+class Resume {
+  -List~ResumeSection~ sections
+  -List~ResumeChange~ changes
+  +deepCopy() Resume
+}
+class ResumeSection {
+  -String heading
+  -List~String~ entries
+  +copy() ResumeSection
+}
+class CoverLetter
+class CandidateProfile {
+  +evidenceCatalog() Map
+  +resolveEvidence(path) Optional~String~
+}
+class JobPosting
+class Requirement
+class FitReport {
+  +isStaleFor(profile, job) boolean
+}
+class GapReport
+class ApplicationRecord {
+  +isOverdue(LocalDate) boolean
+}
+class QuestionSet
+class InterviewSession
+class PreparationPlan
+class ResumeImporter {
+  <<abstract / Creator>>
+  +importText(Path) SourceText
+  #createParser()* DocumentParser
+}
+class PdfResumeImporter
+class TxtResumeImporter
+class DocumentParser {
+  <<interface / Product>>
+  +extractText(Path) SourceText
+}
+class PdfTextParser
+class PlainTextParser
+class ApplicationPackageDirector {
+  <<Director>>
+  +construct(builder, ResolvedSelection) ApplicationPackage
+}
+class ApplicationPackageBuilder {
+  <<interface / Builder>>
+  +reset(JobPosting)
+  +addResume(Resume)
+  +addLetter(CoverLetter)
+  +addPlan(PreparationPlan)
+  +build() ApplicationPackage
+}
+class MarkdownPackageBuilder
+class TextPackageBuilder
+class ApplicationPackage
+class FileExporter {
+  +write(ApplicationPackage, Path) Path
+}
+Entity <|-- Document
+Entity <|-- CandidateProfile
+Entity <|-- JobPosting
+Entity <|-- FitReport
+Entity <|-- GapReport
+Entity <|-- ApplicationRecord
+Entity <|-- QuestionSet
+Entity <|-- InterviewSession
+Entity <|-- PreparationPlan
+Document <|-- Resume
+Document <|-- CoverLetter
+ResumePrototype <|.. Resume
+Resume *-- "1..*" ResumeSection
+JobPosting *-- "1..*" Requirement
+CandidateProfile "1" -- "0..*" Resume
+QuestionSet "1" -- "0..*" InterviewSession
+ResumeImporter <|-- PdfResumeImporter
+ResumeImporter <|-- TxtResumeImporter
+DocumentParser <|.. PdfTextParser
+DocumentParser <|.. PlainTextParser
+PdfResumeImporter ..> PdfTextParser : creates
+TxtResumeImporter ..> PlainTextParser : creates
+ApplicationPackageDirector ..> ApplicationPackageBuilder
+ApplicationPackageBuilder <|.. MarkdownPackageBuilder
+ApplicationPackageBuilder <|.. TextPackageBuilder
+ApplicationPackageBuilder ..> ApplicationPackage : builds
+FileExporter ..> ApplicationPackage : writes

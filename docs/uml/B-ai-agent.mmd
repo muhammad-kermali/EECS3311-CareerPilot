@@ -1,0 +1,94 @@
+classDiagram
+direction TB
+class LLMClient {
+  <<interface>>
+  +generate(LLMRequest) LLMResponse
+  +modelName() String
+}
+class OpenAILLMAdapter {
+  <<Adapter>>
+  -ProviderClient provider
+  -String modelId
+  +generate(LLMRequest) LLMResponse
+}
+class ProviderClient {
+  <<Adaptee>>
+  +post(path, json) String
+}
+class LoggingLLMClient {
+  <<Decorator>>
+  -LLMClient wrapped
+  +generate(LLMRequest) LLMResponse
+}
+class UnconfiguredLLMClient
+class StructuredOutput {
+  +generate(LLMRequest, Parser) T
+  +generate(LLMRequest, Parser, Parser) T
+}
+class CareerAgent {
+  -int maxCalls = 8
+  -Duration timeout = 60s
+  +run(goal, RunContext) AgentResult
+}
+class ToolRegistry {
+  <<Invoker>>
+  +register(AgentTool) ToolRegistry
+  +definitions() List~ToolDefinition~
+  +executeTool(name, argsJson, callId, RunContext) ToolResult
+}
+class ToolCommand {
+  <<interface>>
+  +execute() ToolResult
+}
+class InvokeToolCommand {
+  <<ConcreteCommand>>
+  -AgentTool receiver
+  -ToolArgs args
+  -String callId
+  +execute() ToolResult
+}
+class AgentTool {
+  <<interface / Receiver>>
+  +name() String
+  +parametersSchema() Map
+  +requiredArgs() List~String~
+  +execute(ToolArgs) ToolResult
+}
+class GetProfileTool
+class GetJobTool
+class AnalyzeFitTool
+class InspectDocumentsTool
+class DraftApplicationTool
+class ValidatePlanTool
+class RunContext {
+  +profileId() String
+  +jobId() String
+  +constraints() Constraints
+  +drafts() List~Document~
+}
+class AgentResult {
+  +status AgentStatus
+  +plan PreparationPlan
+  +question String
+  +trace List~AgentStep~
+}
+LLMClient <|.. OpenAILLMAdapter
+LLMClient <|.. LoggingLLMClient
+LLMClient <|.. UnconfiguredLLMClient
+LoggingLLMClient o-- "1" LLMClient : wraps
+OpenAILLMAdapter --> ProviderClient
+StructuredOutput --> LLMClient
+CareerAgent --> LLMClient
+CareerAgent --> ToolRegistry
+CareerAgent ..> AgentResult : returns
+ToolRegistry o-- "*" AgentTool
+ToolRegistry ..> InvokeToolCommand : creates
+ToolCommand <|.. InvokeToolCommand
+InvokeToolCommand --> "1" AgentTool : receiver
+AgentTool <|.. GetProfileTool
+AgentTool <|.. GetJobTool
+AgentTool <|.. AnalyzeFitTool
+AgentTool <|.. InspectDocumentsTool
+AgentTool <|.. DraftApplicationTool
+AgentTool <|.. ValidatePlanTool
+ToolRegistry ..> RunContext : checks scope
