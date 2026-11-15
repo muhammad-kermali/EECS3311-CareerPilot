@@ -8,7 +8,7 @@ EECS3311 Software Design | Muhammad Abbas Kermali | Repository: https://github.c
 
 CareerPilot is a Java 17 desktop application that helps students and early-career applicants prepare job applications. A Swing GUI and a command-line interface both call one `CareerAssistantFacade`, which routes each request to a feature service. Records are stored locally as JSON files with IDs and revision numbers.
 
-**AI integration.** The application calls an OpenAI-compatible chat model (default `gpt-4.1-mini`) through `OpenAILLMAdapter`. The model extracts profile data, analyzes postings, compares evidence, drafts documents, writes interview questions and feedback, and drives the preparation agent. Java code handles validation, state, dates, storage and export.
+**AI integration.** The application calls an OpenAI-compatible chat model through `OpenAILLMAdapter`. The submitted configuration uses Google's free Gemini model `gemini-3.1-flash-lite` through Gemini's OpenAI-compatible endpoint; OpenAI's `gpt-4.1-mini` (the Stage 1 choice) works by changing two settings. The model extracts profile data, analyzes postings, compares evidence, drafts documents, writes interview questions and feedback, and drives the preparation agent. Java code handles validation, state, dates, storage and export.
 
 **Agent behaviour.** In F11, `CareerAgent` runs a tool-use loop with six tools (`get_profile`, `get_job`, `analyze_fit`, `inspect_documents`, `draft_application`, `validate_plan`). It chooses tools based on earlier results: it reuses current fit reports, drafts only missing documents, checks its plan with `validate_plan` before answering, and stops to ask a question when required evidence is missing. Runs stop after 8 tool calls or 60 seconds. Tools cannot save anything; the applicant saves plans and drafts separately.
 
@@ -76,7 +76,7 @@ All seven Stage 1 patterns are implemented as designed. Updated class diagrams: 
 |---|---|---|---|---|
 | Facade | GUI and CLI need the same operations without duplicating coordination and error handling | `CareerAssistantFacade` (facade); services (subsystem); `CareerGUI`, `CareerCLI` (clients) | `app/CareerAssistantFacade.execute()`, `dispatch()` | Yes |
 | Adapter | The provider's request/response format must not spread through the services | `LLMClient` (target), `OpenAILLMAdapter` (adapter), `ProviderClient` (adaptee) | `ai/OpenAILLMAdapter.generate()`, `toProviderJson()`, `fromProviderJson()` | Yes |
-| Decorator | Model calls need timing, outcome and token logging without changing provider code | `LLMClient` (component), `OpenAILLMAdapter` (concrete component), `LoggingLLMClient` (decorator) | `ai/LoggingLLMClient.generate()` returns or rethrows exactly what the wrapped client did and never logs text | Yes |
+| Decorator | Model calls need logging and automatic retry of temporary errors without changing provider code | `LLMClient` (component), `OpenAILLMAdapter` (concrete component), `LoggingLLMClient`, `RetryingLLMClient` (decorators, stacked in `AppFactory`) | `ai/LoggingLLMClient.generate()` logs timing and tokens but never text; `ai/RetryingLLMClient.generate()` retries 429/5xx/timeouts with 2, 4, 8 second waits | Extended: second decorator added |
 | Prototype | Tailoring must not change the base resume through shared lists | `ResumePrototype` (prototype interface), `Resume` (concrete prototype), `DocumentService` (client) | `domain/Resume.deepCopy()`, `ResumeSection.copy()` | Yes |
 | Builder | The same selected documents must be assembled into Markdown or text without format conditions in the service | `ApplicationPackageDirector` (director), `ApplicationPackageBuilder` (builder), `MarkdownPackageBuilder`, `TextPackageBuilder` (concrete builders), `ApplicationPackage` (product) | `export/ApplicationPackageDirector.construct()` | Yes; `reset()` now receives the job (see 4) |
 | Command | Each validated tool request should be a self-contained object, separate from the agent loop | `ToolRegistry` (invoker), `ToolCommand` (command), `InvokeToolCommand` (concrete command), `AgentTool` implementations (receivers), `CareerAgent` (client) | `agent/ToolRegistry.executeTool()`, `InvokeToolCommand.execute()` | Yes |
@@ -97,7 +97,9 @@ All seven Stage 1 patterns are implemented as designed. Updated class diagrams: 
 | Not in Stage 1 | `AppFactory` (composition root), `AppConfig` (.env loading), `UnconfiguredLLMClient` | Wire concrete classes in one place; keep keys out of code; give a clear message when no key is set | Startup only |
 | Not in Stage 1 | Export warns when a document was made from an older profile or job | Stale documents should not be exported silently | F12 |
 | PDF/TXT resumes | PDF/TXT/MD resumes | Markdown is plain text and needs no new parser class | F01 |
-| GPT-4.1 mini only | Any OpenAI-compatible endpoint via `LLM_BASE_URL` and `LLM_MODEL` | Allows cheaper or free models | Configuration only |
+| GPT-4.1 mini via OpenAI | Gemini `gemini-3.1-flash-lite` (free tier) through Gemini's OpenAI-compatible endpoint; any OpenAI-compatible provider via `LLM_BASE_URL` and `LLM_MODEL` | Avoids API cost; the assignment allows free models; no code depended on the provider thanks to the Adapter | Configuration, README, `.env.example` |
+| Tool calls carried only ID, name and arguments | `ToolCall` also carries opaque provider data, which the adapter sends back unchanged | Gemini returns a `thought_signature` with tool calls and expects it back when the conversation continues; dropping it would break the agent | F11, `ai/ToolCall`, `OpenAILLMAdapter` |
+| Only `LoggingLLMClient` decorated the model client | Added `RetryingLLMClient`, stacked around the logging decorator | The free tier often answers "high demand" (503); retrying with growing waits makes features reliable | All AI features |
 
 [Add any changes you make during the rest of Stage 2.]
 
@@ -107,7 +109,7 @@ All seven Stage 1 patterns are implemented as designed. Updated class diagrams: 
 |---|---|---|---|
 | Claude (claude.ai app, agentic coding session) | Configured as `claude-opus-5-5` [confirm in the app's model picker] | Generated the initial implementation of all packages, the tests, sample data, README and this draft; compiled and ran the code against a local stand-in for the OpenAI API | [fill in from your plan or usage page] |
 | [ChatGPT or others, if used] | [model] | [tasks] | [tokens, $] |
-| Application runtime model | `gpt-4.1-mini` via OpenAI API | Used by CareerPilot itself, not a development tool | [from your OpenAI usage page] |
+| Application runtime model | `gemini-3.1-flash-lite` via Gemini API free tier | Used by CareerPilot itself, not a development tool | Free tier ($0) |
 
 **Representative interactions** (keep the log in `docs/ai-collaboration-log.md` up to date and summarize it here):
 
@@ -127,12 +129,16 @@ All seven Stage 1 patterns are implemented as designed. Updated class diagrams: 
 | 3 | Nov 3-9 | [links] |
 
 **Checks performed**
-- 43 automated tests (`mvn test`): repository revision conflicts, Prototype independence, plan validation (cycles, unknown dependencies, time, deadline), evidence grounding, tool registry rejections, agent loop (tool feedback, 8-call limit, single repair, NEEDS_INPUT, provider failure), adapter request/response translation against a local HTTP server, logging decorator, export builders and atomic writing, and end-to-end flows through the facade with a scripted model.
+- 48 automated tests (`mvn test`): repository revision conflicts, Prototype independence, plan validation (cycles, unknown dependencies, time, deadline), evidence grounding, tool registry rejections, agent loop (tool feedback, 8-call limit, single repair, NEEDS_INPUT, provider failure), adapter request/response translation against a local HTTP server (including Gemini thought signatures and Gemini error lists), logging and retrying decorators, export builders and atomic writing, and end-to-end flows through the facade with a scripted model.
 - Every CLI command was run end to end against a local OpenAI-compatible test server, including error paths: invalid dates, unsupported file types, AI service down, invalid quotes, invalid evidence, missing API key, stale revisions, existing export folders and the agent's scope, limit and infeasible cases.
 - The GUI was launched and every tab was exercised, including fit analysis and the agent running on a background thread.
 - [Your own checks with the real model.]
 
 **Defects found and corrected**
+- `gemini-2.5-flash` returned HTTP 404 for a new key ("no longer available to new users"); the app showed only "HTTP 404" because Gemini wraps errors in a list. `ProviderClient` now reads that format, and the configuration uses `gemini-3.1-flash-lite`.
+- Gemini's free tier often returned 503 "high demand"; added `RetryingLLMClient`.
+- The adapter dropped Gemini's `thought_signature` on tool calls, which the agent needs when it continues after a tool result; it is now preserved.
+- PDFBox font-cache warnings reappeared because the logger level was set on a weakly referenced logger; `Main` now keeps a static reference.
 - PDFBox printed font-cache messages on every import; its logger is now limited to severe messages.
 - The interview's pending-feedback message ran two sentences together; reworded.
 - Export could silently package a resume made from an older profile; it now warns.

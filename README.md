@@ -16,7 +16,7 @@ Both interfaces call the same `CareerAssistantFacade`, so every feature behaves 
 
 - Java 17 or newer (`java -version`)
 - Apache Maven 3.9 or newer (`mvn -version`)
-- An API key for an OpenAI-compatible chat model. The default is `gpt-4.1-mini` on OpenAI. Deterministic features (profile editing, application tracking, export) work without a key.
+- A free Google Gemini API key from https://aistudio.google.com (no payment needed). Any other OpenAI-compatible provider also works, for example OpenAI's `gpt-4.1-mini`. Deterministic features (profile editing, application tracking, export) work without a key.
 
 ## Set up your API key (local only)
 
@@ -24,7 +24,7 @@ Both interfaces call the same `CareerAssistantFacade`, so every feature behaves 
 cp .env.example .env        # Windows: copy .env.example .env
 ```
 
-Open `.env` and replace `YOUR_LOCAL_API_KEY_HERE` with your key. `.env` is listed in `.gitignore` and must never be committed. To use another OpenAI-compatible provider, also change `LLM_BASE_URL` and `LLM_MODEL`.
+Open `.env` and replace `YOUR_LOCAL_API_KEY_HERE` with your key. `.env` is listed in `.gitignore` and must never be committed. The example is set up for Gemini (`gemini-3.1-flash-lite`); to use another OpenAI-compatible provider, change `LLM_BASE_URL` and `LLM_MODEL` (the file shows the OpenAI values). If a model returns 404 or "no longer available to new users", pick a current model name from your provider. Busy (503) and rate-limit (429) errors are retried automatically up to 3 times.
 
 ## Build and run
 
@@ -81,7 +81,7 @@ Add `--yes` to accept the confirmation prompts automatically.
 |---|---|
 | Facade | `app.CareerAssistantFacade` |
 | Adapter | `ai.OpenAILLMAdapter` (adapts `ai.ProviderClient` to `ai.LLMClient`) |
-| Decorator | `ai.LoggingLLMClient` |
+| Decorator | `ai.LoggingLLMClient`, `ai.RetryingLLMClient` |
 | Prototype | `domain.ResumePrototype`, `domain.Resume.deepCopy()` |
 | Builder | `export.ApplicationPackageDirector`, `export.ApplicationPackageBuilder`, `MarkdownPackageBuilder`, `TextPackageBuilder` |
 | Command | `agent.ToolCommand`, `agent.InvokeToolCommand`, `agent.ToolRegistry` (invoker), `agent.AgentTool` (receiver) |
