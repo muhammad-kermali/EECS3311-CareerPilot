@@ -91,4 +91,57 @@ class OpenAILLMAdapterTest {
             s.stop(0);
         }
     }
+
+    @Test
+    void geminiThoughtSignaturesAreKeptAndSentBack() throws Exception {
+        AtomicReference<String> req = new AtomicReference<>();
+        String reply = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"c1\",\"type\":\"function\","
+                + "\"function\":{\"name\":\"get_job\",\"arguments\":\"{}\"},\"extra_content\":{\"google\":{\"thought_signature\":\"SIG123\"}}}]}}]}";
+        HttpServer s = server(200, reply, req, new AtomicReference<>());
+        try {
+            LLMResponse first = adapter(s).generate(LLMRequest.chat("agent.step", List.of(Message.user("go")))
+                    .withTools(List.of(new ToolDefinition("get_job", "Get job", Map.of("type", "object")))));
+            ToolCall call = first.toolCalls().get(0);
+            assertTrue(call.providerData().contains("SIG123"));
+
+            adapter(s).generate(LLMRequest.chat("agent.step", List.of(Message.user("go"),
+                    Message.assistantToolCalls(null, List.of(call)), Message.toolResult("c1", "{}"))));
+            JsonNode sent = mapper.readTree(req.get()).path("messages").get(1).path("tool_calls").get(0);
+            assertEquals("SIG123", sent.path("extra_content").path("google").path("thought_signature").asText());
+        } finally {
+            s.stop(0);
+        }
+    }
+
+    @Test
+    void geminiStyleErrorListsAreReadForTheMessage() throws Exception {
+        String body = "[{\"error\":{\"code\":404,\"message\":\"This model is no longer available to new users.\"}}]";
+        HttpServer s = server(404, body, new AtomicReference<>(), new AtomicReference<>());
+        try {
+            LLMException e = assertThrows(LLMException.class, () -> adapter(s).generate(LLMRequest.json("t", "s", "u")));
+            assertTrue(e.getMessage().contains("no longer available to new users"));
+        } finally {
+            s.stop(0);
+        }
+    }
+
+    @Test
+    void toolOnlyAssistantTurnsOmitContentAndMissingIdsAreFilledIn() throws Exception {
+        AtomicReference<String> req = new AtomicReference<>();
+        String reply = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"tool_calls\":[{\"type\":\"function\","
+                + "\"function\":{\"name\":\"get_job\",\"arguments\":\"{}\"}}]}}]}";
+        HttpServer s = server(200, reply, req, new AtomicReference<>());
+        try {
+            ToolCall call = adapter(s).generate(LLMRequest.chat("agent.step", List.of(Message.user("go")))
+                    .withTools(List.of(new ToolDefinition("get_job", "Get job", Map.of("type", "object"))))).toolCalls().get(0);
+            assertTrue(!call.id().isBlank());
+            adapter(s).generate(LLMRequest.chat("agent.step", List.of(Message.user("go"),
+                    Message.assistantToolCalls(null, List.of(call)), Message.toolResult(call.id(), "{}"))));
+            JsonNode assistant = mapper.readTree(req.get()).path("messages").get(1);
+            assertTrue(!assistant.has("content"));
+            assertEquals(call.id(), mapper.readTree(req.get()).path("messages").get(2).path("tool_call_id").asText());
+        } finally {
+            s.stop(0);
+        }
+    }
 }

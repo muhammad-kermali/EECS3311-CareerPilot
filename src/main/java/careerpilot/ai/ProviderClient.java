@@ -51,10 +51,12 @@ public class ProviderClient {
         if (status / 100 != 2) {
             String detail = "";
             try {
-                JsonNode err = mapper.readTree(response.body()).path("error");
-                detail = err.path("message").asText("");
+                JsonNode root = mapper.readTree(response.body());
+                if (root != null && root.isArray() && root.size() > 0) root = root.get(0); // Gemini wraps errors in a list
+                detail = root == null ? "" : root.path("error").path("message").asText("");
             } catch (IOException ignored) { }
             boolean retryable = status == 429 || status >= 500;
+            if (detail.length() > 200) detail = detail.substring(0, 200) + "...";
             String hint = status == 401 ? " Check LLM_API_KEY in your .env file." : "";
             throw new LLMException("AI service returned HTTP " + status + (detail.isBlank() ? "" : ": " + detail) + hint, retryable);
         }

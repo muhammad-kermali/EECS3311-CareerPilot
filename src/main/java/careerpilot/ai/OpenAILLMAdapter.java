@@ -10,7 +10,8 @@ import java.util.List;
 
 /**
  * Adapter: translates our {@link LLMRequest}/{@link LLMResponse} contract to and from the OpenAI
- * Chat Completions format (also used by many OpenAI-compatible providers).
+ * Chat Completions format (also used by many OpenAI-compatible providers such as Gemini's compatibility API).
+ * Provider-specific tool-call fields ({@code extra_content}) are kept and sent back unchanged.
  */
 public class OpenAILLMAdapter implements LLMClient {
     private final ProviderClient provider;
@@ -39,7 +40,10 @@ public class OpenAILLMAdapter implements LLMClient {
         for (Message m : request.messages()) {
             ObjectNode node = messages.addObject();
             node.put("role", m.role());
-            if (m.content() == null) node.putNull("content"); else node.put("content", m.content());
+            // An assistant turn that only calls tools has no text; leave "content" out instead of sending null,
+            // which some OpenAI-compatible providers reject.
+            if (m.content() != null) node.put("content", m.content());
+            else if (m.toolCalls().isEmpty()) node.put("content", "");
             if ("tool".equals(m.role())) node.put("tool_call_id", m.toolCallId());
             if (!m.toolCalls().isEmpty()) {
                 ArrayNode calls = node.putArray("tool_calls");
@@ -50,6 +54,13 @@ public class OpenAILLMAdapter implements LLMClient {
                     ObjectNode fn = call.putObject("function");
                     fn.put("name", c.name());
                     fn.put("arguments", c.argumentsJson() == null ? "{}" : c.argumentsJson());
+                    if (c.providerData() != null) {
+                        try {
+                            call.set("extra_content", mapper.readTree(c.providerData()));
+                        } catch (IOException ignored) {
+                            // Never fail a request because of opaque provider data.
+                        }
+                    }
                 }
             }
         }
@@ -84,9 +95,14 @@ public class OpenAILLMAdapter implements LLMClient {
         JsonNode calls = message.path("tool_calls");
         if (calls.isArray() && calls.size() > 0) {
             List<ToolCall> out = new ArrayList<>();
+            int n = 0;
             for (JsonNode c : calls) {
-                out.add(new ToolCall(c.path("id").asText(), c.path("function").path("name").asText(),
-                        c.path("function").path("arguments").asText("{}")));
+                n++;
+                String id = c.path("id").asText("");
+                if (id.isBlank()) id = "call_" + n + "_" + Integer.toHexString(System.identityHashCode(c)); // some providers omit IDs
+                JsonNode extra = c.get("extra_content");
+                out.add(new ToolCall(id, c.path("function").path("name").asText(),
+                        c.path("function").path("arguments").asText("{}"), extra == null || extra.isNull() ? null : extra.toString()));
             }
             return new LLMResponse(ResponseKind.TOOL_CALLS, message.path("content").asText(null), out, promptTokens, completionTokens);
         }
