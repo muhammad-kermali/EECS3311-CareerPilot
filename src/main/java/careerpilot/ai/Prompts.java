@@ -13,7 +13,8 @@ public final class Prompts {
 
     public static final String GROUNDING_RULE =
             "Never invent facts about the candidate. Every claim about the candidate must be supported by the cited "
-            + "profile evidence. Use only evidence paths that appear in the provided evidence catalog, and copy each "
+            + "profile evidence. Use only evidence paths shown in square brackets in the evidence catalog, "
+            + "copied exactly without the brackets (for example experience:E1:bullet:0 or skill:Java), and copy each "
             + "quote exactly (a short exact substring of that evidence text). Do not add numbers, employers, tools or "
             + "achievements that are not in the evidence. ";
 

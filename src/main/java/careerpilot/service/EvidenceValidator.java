@@ -29,11 +29,11 @@ public class EvidenceValidator {
         if (!array.isArray()) throw new OutputFormatException("evidence must be an array");
         Map<String, String> catalog = profile.evidenceCatalog();
         for (JsonNode e : array) {
-            String path = Json.text(e, "path", false);
+            String path = canonicalPath(Json.text(e, "path", false), catalog);
             String quote = Json.text(e, "quote", false);
             String fact = catalog.get(path);
             if (fact == null) {
-                rejected.add("unknown evidence path '" + path + "'");
+                rejected.add("unknown evidence path '" + path + "' (use a path exactly as shown in square brackets, e.g. experience:E1:bullet:0)");
             } else if (!quote.isBlank() && !TextUtil.containsNormalized(fact, quote)) {
                 rejected.add("quote \"" + TextUtil.truncate(quote, 60) + "\" is not in " + path);
             } else {
@@ -59,10 +59,36 @@ public class EvidenceValidator {
         return numbers;
     }
 
-    /** Builds the catalog section of a prompt: one "path: text" line per fact. */
+    /**
+     * Maps common variations of a path to the catalog's form, e.g. "profile/experience/E1/bullet/0" or
+     * "experience.E1.bullets.0" become "experience:E1:bullet:0". Real-model finding: Gemini sometimes rewrites paths.
+     * Returns the input unchanged when no catalog entry matches, so invented paths are still rejected.
+     */
+    static String canonicalPath(String raw, Map<String, String> catalog) {
+        if (raw == null) return "";
+        String p = raw.trim().replaceAll("^[\\[\"'`]+|[\\]\"'`]+$", "");
+        if (catalog.containsKey(p)) return p;
+        p = p.replaceFirst("(?i)^profile[/:.]", "");
+        // Dots are separators only outside skill paths, because skill names such as Node.js contain dots.
+        if (!p.toLowerCase(java.util.Locale.ROOT).startsWith("skill")) p = p.replace('.', ':');
+        String[] parts = p.split("[/:]", -1);
+        String head = parts[0].toLowerCase(java.util.Locale.ROOT);
+        parts[0] = head.equals("skills") ? "skill" : head.equals("experiences") ? "experience" : head;
+        if (parts[0].equals("skill") && parts.length > 2) {
+            // skill:Node.js written as skill/Node/js is not recoverable; keep the rest joined as one name
+            parts = new String[]{"skill", String.join(":", java.util.Arrays.copyOfRange(parts, 1, parts.length))};
+        }
+        for (int i = 1; i < parts.length; i++) if (parts[i].equalsIgnoreCase("bullets")) parts[i] = "bullet";
+        String candidate = String.join(":", parts);
+        if (catalog.containsKey(candidate)) return candidate;
+        for (String key : catalog.keySet()) if (key.equalsIgnoreCase(candidate)) return key;
+        return raw.trim();
+    }
+
+    /** Builds the catalog section of a prompt: one "[path] text" line per fact. */
     public String catalogForPrompt(CandidateProfile profile) {
         StringBuilder sb = new StringBuilder();
-        profile.evidenceCatalog().forEach((k, v) -> sb.append(k).append(": ").append(v).append('\n'));
+        profile.evidenceCatalog().forEach((k, v) -> sb.append('[').append(k).append("] ").append(v).append('\n'));
         return sb.toString();
     }
 }

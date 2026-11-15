@@ -39,7 +39,7 @@ public class AnalysisService {
     public FitReport analyzeFit(String profileId, String jobId) {
         CandidateProfile profile = repo.load(CandidateProfile.class, profileId);
         JobPosting job = repo.load(JobPosting.class, jobId);
-        StringBuilder user = new StringBuilder("Evidence catalog (path: text):\n<profile>\n")
+        StringBuilder user = new StringBuilder("Evidence catalog (each line is [path] text):\n<profile>\n")
                 .append(evidence.catalogForPrompt(profile)).append("</profile>\n\nRequirements:\n");
         for (Requirement r : job.getRequirements()) {
             user.append(r.getId()).append(" [").append(r.getPriority()).append(", ").append(r.getCategory()).append("]: ")
