@@ -25,8 +25,9 @@ public final class Prompts {
                 + "\"experience\":[{\"title\":\"\",\"organization\":\"\",\"start\":\"YYYY-MM\",\"end\":\"YYYY-MM or Present\",\"bullets\":[\"\"]}],"
                 + "\"sections\":[{\"heading\":\"\",\"entries\":[\"\"]}]}\n"
                 + "Rules: copy wording from the resume; do not improve or invent anything. Use empty strings for unknown "
-                + "values. skills lists individual skills or tools exactly as written. sections reproduces the resume's "
-                + "own sections in order, one entry per line item, so the resume can be re-rendered. Do not include email "
+                + "values. skills lists individual skills or tools exactly as written. sections reproduces EVERY section "
+                + "of the resume in order (for example Summary, Education, Experience, Projects, Skills), with every line "
+                + "item as its own entry, including every experience bullet. Never skip a section. Do not include email "
                 + "or phone (they are extracted separately).";
     }
 

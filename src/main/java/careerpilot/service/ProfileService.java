@@ -55,7 +55,9 @@ public class ProfileService {
         List<String> warnings = new ArrayList<>();
         LLMRequest req = LLMRequest.json("profile.extract", Prompts.resumeExtractionSystem(), "<resume>\n" + text + "\n</resume>");
         CandidateProfile profile = new CandidateProfile();
-        Resume resume = ai.generate(req, json -> parseExtraction(json, profile, warnings));
+        Resume resume = ai.generate(req,
+                json -> parseExtraction(json, profile, warnings, true),
+                json -> parseExtraction(json, profile, warnings, false));
 
         Matcher email = EMAIL.matcher(text);
         if (email.find()) profile.setEmail(email.group());
@@ -75,7 +77,9 @@ public class ProfileService {
         return new ProfilePreview(profile, resume, source.sourceName(), warnings);
     }
 
-    private Resume parseExtraction(JsonNode json, CandidateProfile profile, List<String> warnings) throws OutputFormatException {
+    private Resume parseExtraction(JsonNode json, CandidateProfile profile, List<String> warnings, boolean strict)
+            throws OutputFormatException {
+        warnings.clear(); // a repaired answer replaces the first one, so its warnings start fresh
         profile.setFullName(Json.text(json, "fullName", false));
         profile.setLocation(Json.text(json, "location", false));
         profile.setSummary(Json.text(json, "summary", false));
@@ -108,11 +112,68 @@ public class ProfileService {
             List<String> entries = Json.strings(s, "entries");
             if (!entries.isEmpty()) sections.add(new ResumeSection(Json.text(s, "heading", true), entries));
         }
-        if (sections.isEmpty()) throw new OutputFormatException("sections must contain the resume's sections with their entries");
+        List<String> missing = bulletsMissingFrom(sections, experience);
+        if (sections.isEmpty() || !missing.isEmpty()) {
+            if (strict) {
+                throw new OutputFormatException("sections must reproduce every section of the resume, including all experience "
+                        + "bullets; " + (sections.isEmpty() ? "no sections were given" : missing.size() + " bullet(s) are missing, e.g. \""
+                        + missing.get(0) + "\""));
+            }
+            sections = rebuildSections(profile, education, experience, sections);
+            warnings.add("The AI did not return the resume's full sections, so they were rebuilt from the extracted profile. Check the order and wording.");
+        }
         if (profile.getSkills().isEmpty() && experience.isEmpty() && education.isEmpty()) {
             throw new OutputFormatException("no skills, experience or education were extracted");
         }
         return new Resume(null, "Base resume", sections);
+    }
+
+    /** Experience bullets that do not appear in any section entry. */
+    static List<String> bulletsMissingFrom(List<ResumeSection> sections, List<ExperienceItem> experience) {
+        List<String> missing = new ArrayList<>();
+        for (ExperienceItem e : experience) {
+            for (String b : e.getBullets()) {
+                boolean found = sections.stream().flatMap(s -> s.getEntries().stream())
+                        .anyMatch(entry -> TextUtil.containsNormalized(entry, b) || TextUtil.containsNormalized(b, entry));
+                if (!found) missing.add(b);
+            }
+        }
+        return missing;
+    }
+
+    /**
+     * Deterministic fallback: builds Summary, Experience, Education and Skills sections from the structured profile,
+     * then keeps any other section the AI did return (for example Projects).
+     */
+    static List<ResumeSection> rebuildSections(CandidateProfile profile, List<EducationItem> education,
+                                               List<ExperienceItem> experience, List<ResumeSection> fromAi) {
+        List<ResumeSection> out = new ArrayList<>();
+        if (!TextUtil.isBlank(profile.getSummary())) out.add(new ResumeSection("Summary", List.of(profile.getSummary())));
+        if (!education.isEmpty()) {
+            List<String> entries = new ArrayList<>();
+            for (EducationItem d : education) entries.add(d.describe() + dateRange(d.getStart(), d.getEnd()));
+            out.add(new ResumeSection("Education", entries));
+        }
+        if (!experience.isEmpty()) {
+            List<String> entries = new ArrayList<>();
+            for (ExperienceItem e : experience) {
+                entries.add(e.getTitle() + ", " + e.getOrganization() + dateRange(e.getStart(), e.getEnd()));
+                entries.addAll(e.getBullets());
+            }
+            out.add(new ResumeSection("Experience", entries));
+        }
+        for (ResumeSection s : fromAi) {
+            String h = s.getHeading().toLowerCase(Locale.ROOT);
+            boolean covered = h.contains("summary") || h.contains("education") || h.contains("experience") || h.contains("skill");
+            if (!covered) out.add(s);
+        }
+        if (!profile.getSkills().isEmpty()) out.add(new ResumeSection("Skills", List.of(String.join(", ", profile.getSkills()))));
+        return out;
+    }
+
+    private static String dateRange(String start, String end) {
+        if (TextUtil.isBlank(start) && TextUtil.isBlank(end)) return "";
+        return " (" + (TextUtil.isBlank(start) ? "?" : start) + " - " + (TextUtil.isBlank(end) ? "?" : end) + ")";
     }
 
     private static String normalizeDate(String raw, List<String> warnings) {
