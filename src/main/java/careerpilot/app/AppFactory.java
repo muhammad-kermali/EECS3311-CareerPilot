@@ -12,6 +12,7 @@ import careerpilot.ai.LLMClient;
 import careerpilot.ai.LoggingLLMClient;
 import careerpilot.ai.OpenAILLMAdapter;
 import careerpilot.ai.ProviderClient;
+import careerpilot.ai.RetryingLLMClient;
 import careerpilot.ai.StructuredOutput;
 import careerpilot.ai.UnconfiguredLLMClient;
 import careerpilot.export.ApplicationPackageBuilder;
@@ -51,7 +52,9 @@ public final class AppFactory {
         LLMClient base = config.hasApiKey()
                 ? new OpenAILLMAdapter(new ProviderClient(config.baseUrl(), config.apiKey(), Duration.ofSeconds(config.timeoutSeconds())), config.model())
                 : new UnconfiguredLLMClient();
-        LLMClient llm = new LoggingLLMClient(base, config.workspace().resolve("logs").resolve("llm-calls.log"), clock);
+        // Decorators stack: each attempt is logged, and temporary provider errors are retried up to 3 times.
+        LLMClient logged = new LoggingLLMClient(base, config.workspace().resolve("logs").resolve("llm-calls.log"), clock);
+        LLMClient llm = new RetryingLLMClient(logged, 3, Duration.ofSeconds(2));
         return create(new JsonWorkspaceRepository(config.workspace(), clock), llm, clock);
     }
 
