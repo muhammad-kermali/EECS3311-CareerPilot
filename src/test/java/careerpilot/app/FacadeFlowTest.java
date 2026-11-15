@@ -112,9 +112,10 @@ class FacadeFlowTest {
     @Test
     void letterWithUnsupportedClaimMustBeEditedBeforeSaving() throws Exception {
         seedProfileAndJob();
-        llm.thenText("{\"paragraphs\":[{\"text\":\"Dear Hiring Manager,\",\"evidence\":[]},"
+        String letterJson = "{\"paragraphs\":[{\"text\":\"Dear Hiring Manager,\",\"evidence\":[]},"
                 + "{\"text\":\"I led 12 engineers building Java REST APIs.\",\"evidence\":[{\"path\":\"experience:E1:bullet:0\",\"quote\":\"Java REST API\"}]},"
-                + "{\"text\":\"Sincerely, Jordan\",\"evidence\":[]}]}");
+                + "{\"text\":\"Sincerely, Jordan\",\"evidence\":[]}]}";
+        llm.thenText(letterJson).thenText(letterJson); // the repair attempt repeats the unsupported claim
         CoverLetter letter = ok(FeatureRequest.of(Operation.DRAFT_LETTER).with("jobId", "J1")).payload(CoverLetter.class);
         assertEquals(1, letter.unsupportedCount());
         assertFalse(facade.execute(FeatureRequest.of(Operation.SAVE_DRAFT).with("draft", letter)).isOk());
@@ -165,6 +166,34 @@ class FacadeFlowTest {
         assertTrue(r.error().contains("not found"));
         FeatureResult noProfile = facade.execute(FeatureRequest.of(Operation.ANALYZE_FIT).with("jobId", "J1"));
         assertTrue(noProfile.error().contains("Import a resume first"));
+    }
+
+    @Test
+    void letterWarningsReachTheUserAndRealProfileNumbersAreAllowed() throws Exception {
+        seedProfileAndJob();
+        // Real-model finding (Gemini, Nov 14): a true number cited from a different bullet was flagged and no reason was shown.
+        String letterJson = "{\"paragraphs\":[{\"text\":\"Dear Hiring Manager,\",\"evidence\":[]},"
+                + "{\"text\":\"My Java REST API was used by 3 teams.\",\"evidence\":[{\"path\":\"skill:Java\",\"quote\":\"Java\"}]},"
+                + "{\"text\":\"I also led 12 engineers.\",\"evidence\":[{\"path\":\"skill:Java\",\"quote\":\"Java\"}]}]}";
+        llm.thenText(letterJson).thenText(letterJson); // the repair attempt repeats the unsupported claim
+        FeatureResult r = ok(FeatureRequest.of(Operation.DRAFT_LETTER).with("jobId", "J1"));
+        CoverLetter letter = r.payload(CoverLetter.class);
+        assertTrue(letter.getParagraphs().get(1).isSupported(), "3 is in the profile, so it is supported");
+        assertFalse(letter.getParagraphs().get(2).isSupported(), "12 is not in the profile");
+        assertTrue(r.warnings().stream().anyMatch(w -> w.contains("Paragraph 3") && w.contains("12")));
+    }
+
+    @Test
+    void letterWithBadEvidencePathsGetsOneRepairBeforeAnythingIsFlagged() throws Exception {
+        seedProfileAndJob();
+        String bad = "{\"paragraphs\":[{\"text\":\"Dear Hiring Manager,\",\"evidence\":[]},"
+                + "{\"text\":\"I built a Java REST API.\",\"evidence\":[{\"path\":\"resume/job1\",\"quote\":\"Java\"}]}]}";
+        String good = "{\"paragraphs\":[{\"text\":\"Dear Hiring Manager,\",\"evidence\":[]},"
+                + "{\"text\":\"I built a Java REST API.\",\"evidence\":[{\"path\":\"experience:E1:bullet:0\",\"quote\":\"Java REST API\"}]}]}";
+        llm.thenText(bad).thenText(good);
+        CoverLetter letter = ok(FeatureRequest.of(Operation.DRAFT_LETTER).with("jobId", "J1")).payload(CoverLetter.class);
+        assertEquals(0, letter.unsupportedCount());
+        assertEquals("document.letter.repair", llm.requests.get(llm.requests.size() - 1).purpose());
     }
 
     /** Small helper so the stale check reads clearly in the test above. */

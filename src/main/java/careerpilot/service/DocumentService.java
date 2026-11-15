@@ -64,7 +64,7 @@ public class DocumentService {
             for (int e = 0; e < entries.size(); e++) user.append("  ").append(s).append('.').append(e).append(": ").append(entries.get(e)).append('\n');
         }
         user.append("</resume>\n\nJob requirements:\n").append(requirementsText(job))
-                .append("\nEvidence catalog (path: text):\n<profile>\n").append(evidence.catalogForPrompt(profile)).append("</profile>");
+                .append("\nEvidence catalog (each line is [path] text):\n<profile>\n").append(evidence.catalogForPrompt(profile)).append("</profile>");
 
         LLMRequest req = LLMRequest.json("document.tailor", Prompts.tailorSystem(), user.toString());
         List<ResumeChange> changes = ai.generate(req, json -> parseChanges(json, copy, job, profile));
@@ -112,9 +112,11 @@ public class DocumentService {
                 + "\nRole: " + job.getTitle() + "\nCompany: " + (TextUtil.isBlank(job.getCompany()) ? "(not stated; do not name it)" : job.getCompany())
                 + (TextUtil.isBlank(motivation) ? "" : "\nApplicant's own motivation (may be used as stated): <answer>" + motivation.trim() + "</answer>")
                 + "\n\nJob requirements:\n" + requirementsText(job)
-                + "\nEvidence catalog (path: text):\n<profile>\n" + evidence.catalogForPrompt(profile) + "</profile>";
+                + "\nEvidence catalog (each line is [path] text):\n<profile>\n" + evidence.catalogForPrompt(profile) + "</profile>";
         LLMRequest req = LLMRequest.json("document.letter", Prompts.letterSystem(), user).withTemperature(0.5);
-        List<LetterParagraph> paragraphs = ai.generate(req, json -> parseParagraphs(json, profile, job, motivation));
+        List<LetterParagraph> paragraphs = ai.generate(req,
+                json -> parseParagraphs(json, profile, job, motivation, true),
+                json -> parseParagraphs(json, profile, job, motivation, false));
         CoverLetter letter = new CoverLetter(profileId, jobId, t, paragraphs);
         letter.recordSource(profile);
         letter.recordSource(job);
@@ -128,7 +130,7 @@ public class DocumentService {
         return letter;
     }
 
-    private List<LetterParagraph> parseParagraphs(JsonNode json, CandidateProfile profile, JobPosting job, String motivation)
+    private List<LetterParagraph> parseParagraphs(JsonNode json, CandidateProfile profile, JobPosting job, String motivation, boolean strict)
             throws OutputFormatException {
         List<LetterParagraph> out = new ArrayList<>();
         for (JsonNode p : Json.array(json, "paragraphs")) {
@@ -136,12 +138,22 @@ public class DocumentService {
             EvidenceValidator.Checked checked = evidence.readEvidence(p.get("evidence"), profile);
             LetterParagraph para = new LetterParagraph(text, checked.valid());
             List<String> problems = new ArrayList<>(checked.rejected());
-            Set<String> numbers = evidence.unsupportedNumbers(text, checked.valid(), profile, job.getSourceText(), motivation);
+            // A letter paragraph may combine several facts, so a number counts as supported if it appears anywhere in
+            // the applicant's confirmed profile (or the posting / their own motivation), not only in the cited items.
+            String allFacts = String.join(" ", profile.evidenceCatalog().values());
+            Set<String> numbers = evidence.unsupportedNumbers(text, checked.valid(), profile, allFacts, job.getSourceText(), motivation);
             if (!numbers.isEmpty()) problems.add("numbers not in the evidence: " + numbers);
             para.markGrounding(problems.isEmpty(), problems.isEmpty() ? null : String.join("; ", problems));
             out.add(para);
         }
         if (out.size() < 2 || out.size() > 6) throw new OutputFormatException("write 3 to 5 paragraphs");
+        if (strict) {
+            List<String> bad = new ArrayList<>();
+            for (int i = 0; i < out.size(); i++) {
+                if (!out.get(i).isSupported()) bad.add("paragraph " + (i + 1) + ": " + out.get(i).getUnsupportedReason());
+            }
+            if (!bad.isEmpty()) throw new OutputFormatException("fix the evidence: " + String.join("; ", bad));
+        }
         return out;
     }
 

@@ -3,7 +3,7 @@ package careerpilot.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CoverLetter extends Document {
+public class CoverLetter extends Document implements HasWarnings {
     private String profileId;
     private String jobId;
     private String tone;
@@ -33,6 +33,7 @@ public class CoverLetter extends Document {
     public String getText() { return text; }
     public List<LetterParagraph> getParagraphs() { return paragraphs; }
     public List<String> getWarnings() { return warnings; }
+    @Override public List<String> warnings() { return warnings; }
     public void setText(String text) { this.text = text; }
 
     /** True if the applicant changed the generated text before saving. */
