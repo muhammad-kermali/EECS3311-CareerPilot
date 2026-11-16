@@ -45,8 +45,11 @@ public class PlanPanel extends JPanel implements RefreshablePanel {
         super(new BorderLayout());
         this.gui = gui;
         this.job = new JobChooser(gui);
-        add(GuiSupport.row(new JLabel("Job:"), job, new JLabel("Minutes available:"), minutes, new JLabel("Deadline:"), deadline,
-                new JLabel("Preferences:"), preferences, GuiSupport.button("Prepare Application", this::prepare)), BorderLayout.NORTH);
+        // Two rows so the Prepare button is never pushed off the edge of a normal-size window.
+        JPanel top = new JPanel(new GridLayout(2, 1));
+        top.add(GuiSupport.row(new JLabel("Job:"), job, new JLabel("Minutes available:"), minutes, new JLabel("Deadline (YYYY-MM-DD):"), deadline));
+        top.add(GuiSupport.row(new JLabel("Preferences (optional):"), preferences, GuiSupport.button("Prepare Application", this::prepare)));
+        add(top, BorderLayout.NORTH);
 
         JPanel result = new JPanel(new BorderLayout(4, 4));
         result.add(status, BorderLayout.NORTH);
