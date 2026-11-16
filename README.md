@@ -111,3 +111,10 @@ docs/           Stage 2 report draft and updated UML
 - The agent's tools are read-only or create unsaved drafts. Only the applicant saves documents and plans.
 - Job postings and resumes are treated as data; instructions inside them are ignored.
 - Nothing is ever sent to an employer.
+
+## Stage 2 demo videos
+
+- Part 1 (F01 to F06): https://youtu.be/Uz7fT3sWZ2U
+- Part 2 (F07 to F12): https://youtu.be/4y0vOQqgCr8
+
+Report: [stage2-report.pdf](stage2-report.pdf). AI collaboration log: [docs/ai-collaboration-log.md](docs/ai-collaboration-log.md)
