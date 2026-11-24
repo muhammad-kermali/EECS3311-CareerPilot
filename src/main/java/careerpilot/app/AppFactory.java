@@ -43,7 +43,12 @@ import java.util.Map;
 /** Composition root: the only place that knows the concrete classes. */
 public final class AppFactory {
     public static final int MAX_AGENT_CALLS = 8;
-    public static final Duration AGENT_TIMEOUT = Duration.ofSeconds(60);
+    /**
+     * Default time limit for one agent run. Stage 1 planned 60 seconds; with a free-tier model the AI calls made
+     * inside tools (for example a full fit analysis) and the occasional slow reply that has to be retried made
+     * 60 seconds too short, so the default is 180 and it can be changed with AGENT_TIMEOUT_SECONDS.
+     */
+    public static final Duration AGENT_TIMEOUT = Duration.ofSeconds(180);
 
     private AppFactory() { }
 
@@ -55,11 +60,16 @@ public final class AppFactory {
         // Decorators stack: each attempt is logged, and temporary provider errors are retried up to 3 times.
         LLMClient logged = new LoggingLLMClient(base, config.workspace().resolve("logs").resolve("llm-calls.log"), clock);
         LLMClient llm = new RetryingLLMClient(logged, 3, Duration.ofSeconds(2));
-        return create(new JsonWorkspaceRepository(config.workspace(), clock), llm, clock);
+        return create(new JsonWorkspaceRepository(config.workspace(), clock), llm, clock, Duration.ofSeconds(config.agentTimeoutSeconds()));
     }
 
     /** Wires every service around the given repository and model client. Tests pass a fake client here. */
     public static CareerAssistantFacade create(WorkspaceRepository repo, LLMClient llm, Clock clock) {
+        return create(repo, llm, clock, AGENT_TIMEOUT);
+    }
+
+    /** Same as above, with an explicit time limit for the agent. */
+    public static CareerAssistantFacade create(WorkspaceRepository repo, LLMClient llm, Clock clock, Duration agentTimeout) {
         StructuredOutput ai = new StructuredOutput(llm);
         EvidenceValidator evidence = new EvidenceValidator();
         Map<String, ResumeImporter> importers = new LinkedHashMap<>();
@@ -82,7 +92,7 @@ public final class AppFactory {
                 .register(new InspectDocumentsTool(documents))
                 .register(new DraftApplicationTool(documents))
                 .register(new ValidatePlanTool(planValidator));
-        CareerAgent agent = new CareerAgent(llm, registry, MAX_AGENT_CALLS, AGENT_TIMEOUT, clock);
+        CareerAgent agent = new CareerAgent(llm, registry, MAX_AGENT_CALLS, agentTimeout, clock);
         PlanService plans = new PlanService(repo, agent, planValidator);
 
         Map<String, ApplicationPackageBuilder> builders = new LinkedHashMap<>();

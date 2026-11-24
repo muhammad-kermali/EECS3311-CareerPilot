@@ -60,7 +60,7 @@ public class CareerAgent {
 
         while (true) {
             if (Duration.between(start, clock.instant()).compareTo(timeout) > 0) {
-                return stop(AgentStatus.TIMED_OUT, "Stopped after " + timeout.toSeconds() + " seconds without a final plan.", ctx, trace, calls);
+                return stop(AgentStatus.TIMED_OUT, "Stopped after " + timeout.toSeconds() + " seconds without a final plan. The AI service may be slow right now; try again, or raise AGENT_TIMEOUT_SECONDS in .env.", ctx, trace, calls);
             }
             LLMResponse response;
             try {

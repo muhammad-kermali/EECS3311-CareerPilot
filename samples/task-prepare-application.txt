@@ -1,0 +1,10 @@
+# CareerPilot task: let the agent prepare a whole application.
+# Run from the project folder:
+#   java -jar target/careerpilot.jar --llm gemini --input samples/task-prepare-application.txt
+# Paths are relative to the project folder (run it from there), so it also works through stdin.
+task: prepare-application
+resume: samples/resume-jordan-lee.pdf
+job: samples/job-northwind-junior-dev.txt
+minutes: 180
+deadline: 2026-11-30
+preferences: focus on backend Java work

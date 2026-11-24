@@ -36,6 +36,70 @@ mvn package                 # compiles, runs the unit tests, builds target/caree
 
 You can also run `java -jar target/careerpilot.jar` directly. With no arguments it opens the GUI; with arguments it runs a CLI command. Data is stored as JSON files in `workspace/` (git-ignored). Model calls are logged to `workspace/logs/llm-calls.log` with timing and token counts only, never prompt text.
 
+## Standalone CLI (run a task from a file or standard input)
+
+CareerPilot can run a whole task from a file without asking anything, which is how it is meant to be run by scripts and in Stage 3 testing. The agent and every validation step run exactly as in the GUI, because both go through the same `CareerAssistantFacade`.
+
+```bash
+java -jar target/careerpilot.jar --llm gemini --input samples/task-prepare-application.txt
+```
+
+That task file (in `samples/`) looks like this:
+
+```text
+task: prepare-application
+resume: samples/resume-jordan-lee.pdf
+job: samples/job-northwind-junior-dev.txt
+minutes: 180
+deadline: 2026-11-30
+preferences: focus on backend Java work
+```
+
+Expected output: the resume is imported as a profile, the job is analyzed, the agent's tool calls are listed (for example `inspect_documents`, `analyze_fit`, `validate_plan`), then its plan, and `Saved plan PL1`. The exit code is 0.
+
+**Other ways to give the task**
+
+```bash
+# from standard input
+cat samples/task-prepare-application.txt | java -jar target/careerpilot.jar --llm gemini --input -
+# one-dash spelling also works
+java -jar target/careerpilot.jar -LLMAPI gemini -input samples/task-fit.txt
+# JSON output for scripts and automated tests (stdout holds only the JSON document)
+java -jar target/careerpilot.jar --llm gemini --json --input samples/task-fit.txt
+# a command script: one CLI command per line, run in order without questions
+java -jar target/careerpilot.jar --input samples/task-commands.txt
+```
+
+**Options** (put them before the command; `--name` and `-name` are the same)
+
+| Option | Meaning |
+|---|---|
+| `--input FILE` or `--input -` | Run the task in FILE, or read it from standard input |
+| `--llm gemini\|openai\|ollama` (alias `-LLMAPI`) | Which LLM API to use; sets the base URL and a default model |
+| `--llm-model NAME` | Model name, for example `gemini-3.1-flash-lite` |
+| `--llm-base-url URL` | Any OpenAI-compatible endpoint |
+| `--llm-key-env NAME` | Read the API key from this environment variable (default: `LLM_API_KEY` or `.env`) |
+| `--workspace DIR` | Where data is stored (default `workspace`) |
+| `--json` | Task mode: print the result as one JSON document |
+| `--gui` | Open the GUI (also the default with no arguments) |
+| `--help` | Show all options |
+
+**Task file keys** (`key: value`, one per line, `#` starts a comment)
+
+| Key | Used by | Meaning |
+|---|---|---|
+| `task` | all | `prepare-application` (default), `fit`, `gaps`, `tailor-resume`, `cover-letter`, `interview-questions` |
+| `resume` | all | Resume file to import first (optional if a profile is already saved) |
+| `job` or `job-id` | all | Job posting file to analyze, or the ID of a saved job |
+| `company` | all | Company name, if the posting does not say |
+| `minutes`, `deadline`, `preferences` | prepare-application | Time available, deadline (YYYY-MM-DD), anything the agent should know |
+| `tone`, `motivation` | cover-letter | `professional`, `enthusiastic` or `concise`; your own reason for applying |
+| `count`, `focus` | interview-questions | 1 to 20 questions; `technical`, `behavioural` or `mixed` |
+| `save` | all | `yes` (default) saves results that pass validation; `no` only prints them |
+| `save-drafts` | prepare-application | `yes` also saves drafts the agent created (default `no`) |
+
+Relative paths are tried from the folder you run in (the project folder in these examples), then from the task file's folder. The agent has 8 tool calls and, by default, 180 seconds per run (set `AGENT_TIMEOUT_SECONDS` in `.env` to change it). Exit codes: `0` the task finished (including when the agent asks a question or says the time is not enough), `1` a step failed (for example the AI service was unavailable, or the agent ran out of time or tool calls), `2` the task file or options are invalid.
+
 ## Try it with the sample data
 
 The `samples/` folder has a fictional resume and job posting.

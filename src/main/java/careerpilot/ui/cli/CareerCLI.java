@@ -506,6 +506,7 @@ public class CareerCLI {
     private void help() {
         out.println("""
                 CareerPilot CLI. Usage: career <command> [options]   (no command starts the GUI)
+                  Run a whole task from a file or stdin: career --input task.txt   (see: career --help)
                   resume import --file resume.pdf [--yes]                 F01 import resume and extract profile
                   profile show | profile edit [--name --email --phone --location --summary
                                  --add-skill a,b --remove-skill c --entry E1 --start 2024-05 --end Present]   F02

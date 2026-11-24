@@ -86,7 +86,7 @@ public class PlanPanel extends JPanel implements RefreshablePanel {
 
     private void prepare() {
         if (job.selectedJobId() == null) { GuiSupport.error(this, "Add a job first."); return; }
-        status.setText("The agent is working (at most 8 tool calls, 60 seconds)...");
+        status.setText("The agent is working (at most 8 tool calls; this can take a minute or two)...");
         gui.run(this, "Agent is preparing your application", FeatureRequest.of(Operation.PREPARE_APPLICATION).with("jobId", job.selectedJobId())
                 .with("minutes", minutes.getValue()).with("deadline", deadline.getText()).with("preferences", preferences.getText()), r -> show(r.payload(PreparationPreview.class)));
     }

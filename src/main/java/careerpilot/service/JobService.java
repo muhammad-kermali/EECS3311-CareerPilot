@@ -42,6 +42,10 @@ public class JobService {
     }
 
     public JobPreview analyzeJobFile(Path file, String company, String url, String deadline) {
+        if (!java.nio.file.Files.isRegularFile(file)) {
+            throw new careerpilot.common.ValidationException("Job posting file not found: " + file.toAbsolutePath()
+                    + ". Paths are relative to the folder you run CareerPilot from, or to the task file.");
+        }
         return analyzeJob(new PlainTextParser().extractText(file).text(), company, url, deadline);
     }
 

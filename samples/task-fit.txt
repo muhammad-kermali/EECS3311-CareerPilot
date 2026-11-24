@@ -1,0 +1,4 @@
+# CareerPilot task: fit analysis for a job, using the profile that is already saved.
+# java -jar target/careerpilot.jar --input samples/task-fit.txt
+task: fit
+job: samples/job-northwind-junior-dev.txt

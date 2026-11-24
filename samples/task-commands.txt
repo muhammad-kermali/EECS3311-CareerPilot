@@ -1,0 +1,7 @@
+# CareerPilot command script: each line is a CLI command, run in order without questions.
+# java -jar target/careerpilot.jar --input samples/task-commands.txt
+resume import --file samples/resume-jordan-lee.pdf
+job import --file samples/job-northwind-junior-dev.txt
+job fit --job J1
+application update --job J1 --status saved --notes "Prepared by a command script"
+application list
