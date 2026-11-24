@@ -180,5 +180,6 @@ docs/           Stage 2 report draft and updated UML
 
 - Part 1 (F01 to F06): https://youtu.be/Uz7fT3sWZ2U
 - Part 2 (F07 to F12): https://youtu.be/4y0vOQqgCr8
+- Part 3 (one task in the GUI, then the standalone CLI): https://youtu.be/Ty_fys1pfW8
 
 Report: [stage2-report.pdf](stage2-report.pdf). AI collaboration log: [docs/ai-collaboration-log.md](docs/ai-collaboration-log.md)

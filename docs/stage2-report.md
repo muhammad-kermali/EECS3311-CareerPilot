@@ -6,28 +6,28 @@ Muhammad Abbas Kermali
 Fall 2026  
 Repository: https://github.com/muhammad-kermali/EECS3311-CareerPilot
 
-Demo videos: [Part 1 (F01 to F06)](https://youtu.be/Uz7fT3sWZ2U) and [Part 2 (F07 to F12)](https://youtu.be/4y0vOQqgCr8)
+Demo videos: [Part 1 (F01 to F06)](https://youtu.be/Uz7fT3sWZ2U), [Part 2 (F07 to F12)](https://youtu.be/4y0vOQqgCr8) and [Part 3 (one task in the GUI, then the CLI)](https://youtu.be/Ty_fys1pfW8)
 
 ## 1. Project overview and implementation status
 
-CareerPilot is a Java 17 desktop application that helps students and early-career applicants prepare job applications. A Swing GUI and a command-line interface both call one CareerAssistantFacade, which routes each request to a feature service. Records are stored locally as JSON files with IDs and revision numbers.
+CareerPilot is a Java 17 desktop app that helps students prepare job applications. It has a Swing GUI and a command-line interface (CLI), and both of them call the same CareerAssistantFacade, which sends each request to the right service. Everything is saved locally as JSON files with IDs and revision numbers.
 
-AI integration: The application calls an OpenAI-compatible chat model through OpenAILLMAdapter. The submitted configuration uses Google's free Gemini model gemini-3.1-flash-lite through Gemini's OpenAI-compatible endpoint; OpenAI's gpt-4.1-mini (the Stage 1 choice) works by changing two settings. The model extracts profile data, analyzes postings, compares evidence, drafts documents, writes interview questions and feedback, and drives the preparation agent. Java code handles validation, state, dates, storage and export.
+**AI.** The app talks to the AI through OpenAILLMAdapter, which works with any OpenAI-compatible API. I used Google's free gemini-3.1-flash-lite model. OpenAI's gpt-4.1-mini (my Stage 1 choice) also works by changing two settings. The AI reads resumes and job postings, compares them, writes documents and interview questions, gives feedback, and runs the agent. Normal Java code handles checking, saving, dates and export.
 
-Agent behaviour: In F11, CareerAgent runs a tool-use loop with six tools (get_profile, get_job, analyze_fit, inspect_documents, draft_application, validate_plan). It chooses tools based on earlier results: it reuses current fit reports, drafts only missing documents, checks its plan with validate_plan before answering, and stops to ask a question when required evidence is missing. Runs stop after 8 tool calls or 60 seconds. Tools cannot save anything; the applicant saves plans and drafts separately.
+**Agent.** In F11, CareerAgent decides for itself which of six tools to use (get_profile, get_job, analyze_fit, inspect_documents, draft_application, validate_plan). It checks its own plan before answering and asks a question if info is missing. It stops after 8 tool calls or 180 seconds, and it can't save anything. I save the plan myself.
 
-Grounding: Every AI claim about the candidate must cite profile evidence (experience:E1:bullet:0 style paths with an exact quote). EvidenceValidator checks that each path exists and the quote appears in that fact, and flags any number in a claim that the evidence does not contain. Unsupported resume changes cannot be saved, and unsupported letter paragraphs must be edited before saving. Job requirements must quote the posting exactly.
+**Keeping the AI honest.** Every claim the AI makes about me has to point to a real fact in my profile, like experience:E1:bullet:0 with a quote. EvidenceValidator checks that the fact exists, that the quote matches, and that the AI didn't add new numbers. Resume changes without real evidence can't be saved, and job requirements have to quote the posting exactly.
 
-Status: All 12 Stage 1 features are implemented, work in both interfaces, and were tested end to end with the real model (gemini-3.1-flash-lite). Testing with the real model found five defects that a scripted test model had not shown; all five were fixed and retested (section 6). The project has 54 automated tests, all passing.
+**Status.** All 12 features from Stage 1 work in both the GUI and the CLI, and I tested all of them with the real model. Testing with the real model found six bugs that the fake test model didn't, and they're all fixed (section 6). For Stage 3, I added a standalone CLI that runs a task from a file or standard input (section 2.2). There are 66 automated tests and they all pass.
 
-Limitations:
+**Limitations.**
 
-- Only text-based PDF, TXT and MD resumes are supported (no OCR, no DOCX).
-- Tailoring rewrites existing resume lines; it does not reorder sections.
-- Grounding checks catch invented paths, misquotes and new numbers, but they cannot prove that reworded text is fully faithful. The applicant still reviews every draft.
-- One applicant profile per workspace.
-- The free Gemini tier is rate limited. Temporary errors are retried automatically, but a very busy period can still make an AI feature fail; trying again a minute later works.
-- Output quality depends on the model. A small free model sometimes formats answers differently from the instructions (for example evidence paths); the validators catch this and ask for one repair, and anything still invalid is flagged or dropped rather than trusted.
+- Only text PDF, TXT and MD resumes work (no scanned PDFs or Word files).
+- Tailoring rewrites lines in the resume but doesn't reorder sections.
+- The checks catch made-up facts, wrong quotes and new numbers, but they can't prove a reworded sentence means exactly the same thing, so I still review every draft.
+- One profile per workspace.
+- The free Gemini tier has rate limits and can be slow. Failed calls are retried, but sometimes you have to try again a minute later.
+- A small free model sometimes doesn't follow the format exactly. The code catches this, asks once for a fix, and drops anything that's still wrong.
 
 ## 2. Feature to implementation mapping
 
@@ -35,7 +35,7 @@ Every feature enters through CareerGUI.submit() or CareerCLI.submit(), then Care
 
 | ID | Feature | Stage 1 | Status | Main classes / files | Key methods | Patterns | Video |
 |---|---|---|---|---|---|---|---|
-| F01 | Import resume and extract profile | F01 | Implemented (modified, see 4) | service/ProfileService, parsing/ResumeImporter, PdfResumeImporter, TxtResumeImporter, PdfTextParser, PlainTextParser, ai/StructuredOutput | importResume(), importText(), createParser(), extractText(), confirmImport() | Facade, Factory Method, Adapter, Decorator | [Part 1, F01 segment](https://youtu.be/Uz7fT3sWZ2U) |
+| F01 | Import resume and extract profile | F01 | Implemented (modified, see 2.1) | service/ProfileService, parsing/ResumeImporter, PdfResumeImporter, TxtResumeImporter, PdfTextParser, PlainTextParser, ai/StructuredOutput | importResume(), importText(), createParser(), extractText(), confirmImport() | Facade, Factory Method, Adapter, Decorator | [Part 1, F01 segment](https://youtu.be/Uz7fT3sWZ2U) |
 | F02 | Review and correct profile | F02 | Implemented | service/ProfileService, domain/CandidateProfile, storage/JsonWorkspaceRepository, ui/gui/ProfilePanel | getProfile(), updateProfile(), validate(), save() | Facade | [Part 1, F02 segment](https://youtu.be/Uz7fT3sWZ2U) |
 | F03 | Import and analyze a job | F03 | Implemented | service/JobService, domain/JobPosting, Requirement, JobPreview | analyzeJob(), detectDeadline(), saveJob() | Facade, Adapter, Decorator | [Part 1, F03 segment](https://youtu.be/Uz7fT3sWZ2U) |
 | F04 | Fit analysis with evidence | F04 | Implemented | service/AnalysisService, EvidenceValidator, domain/FitReport | analyzeFit(), readEvidence(), isStaleFor() | Facade, Adapter, Decorator | [Part 1, F04 segment](https://youtu.be/Uz7fT3sWZ2U) |
@@ -43,36 +43,179 @@ Every feature enters through CareerGUI.submit() or CareerCLI.submit(), then Care
 | F06 | Tailored resume version | F06 | Implemented | service/DocumentService, domain/Resume, ResumePrototype, ResumeChange | tailorResume(), deepCopy(), saveDraft() | Facade, Prototype, Adapter, Decorator | [Part 1, F06 segment](https://youtu.be/Uz7fT3sWZ2U) |
 | F07 | Cover letter draft | F07 | Implemented | service/DocumentService, domain/CoverLetter, LetterParagraph | draftLetter(), saveDraft() | Facade, Adapter, Decorator | [Part 2, F07 segment](https://youtu.be/4y0vOQqgCr8) |
 | F08 | Interview questions | F08 | Implemented | service/InterviewService, domain/QuestionSet, InterviewQuestion | generateQuestions() | Facade, Adapter, Decorator | [Part 2, F08 segment](https://youtu.be/4y0vOQqgCr8) |
-| F09 | Mock interview with feedback | F09 | Implemented (modified, see 4) | service/InterviewService, AnswerOutcome, domain/InterviewSession, AnswerRecord, Feedback | startInterview(), submitAnswer(), retryFeedback(), pauseInterview() | Facade, Adapter, Decorator | [Part 2, F09 segment](https://youtu.be/4y0vOQqgCr8) |
+| F09 | Mock interview with feedback | F09 | Implemented (modified, see 2.1) | service/InterviewService, AnswerOutcome, domain/InterviewSession, AnswerRecord, Feedback | startInterview(), submitAnswer(), retryFeedback(), pauseInterview() | Facade, Adapter, Decorator | [Part 2, F09 segment](https://youtu.be/4y0vOQqgCr8) |
 | F10 | Application tracking | F10 | Implemented | service/ApplicationService, ApplicationView, domain/ApplicationRecord, ApplicationStatus | updateApplication(), listApplications(), isOverdue() | Facade | [Part 2, F10 segment](https://youtu.be/4y0vOQqgCr8) |
-| F11 | Application preparation agent | F11 | Implemented | service/PlanService, agent/CareerAgent, ToolRegistry, ToolCommand, InvokeToolCommand, AgentTool, agent/tools/*, service/PlanValidator | prepareApplication(), run(), executeTool(), execute(), validate(), savePlan() | Facade, Command, Adapter, Decorator | [Part 2, F11 segment](https://youtu.be/4y0vOQqgCr8) |
+| F11 | Application preparation agent | F11 | Implemented (modified, see 2.1) | service/PlanService, agent/CareerAgent, ToolRegistry, ToolCommand, InvokeToolCommand, AgentTool, agent/tools/*, service/PlanValidator | prepareApplication(), run(), executeTool(), execute(), validate(), savePlan() | Facade, Command, Adapter, Decorator | [Part 2, F11 segment](https://youtu.be/4y0vOQqgCr8), [Part 3](https://youtu.be/Ty_fys1pfW8) |
 | F12 | Export application package | F12 | Implemented | service/ExportService, export/ApplicationPackageDirector, ApplicationPackageBuilder, MarkdownPackageBuilder, TextPackageBuilder, FileExporter | exportPackage(), construct(), reset(), addResume(), build(), write() | Facade, Builder | [Part 2, F12 segment](https://youtu.be/4y0vOQqgCr8) |
 
-### How each feature works
+## 2.1 Each feature: requirement, screenshot, implementation and changes
 
-F01 (hybrid). ProfileService.importResume() picks a ResumeImporter by file extension. importText() checks size and emptiness, calls the subclass's createParser(), and extracts text with PDFBox or plain reading. StructuredOutput.generate() sends the text to the model with a JSON schema and validates the answer (one repair attempt). Email and phone are found with regular expressions, dates are normalized to YYYY-MM, and any skill or bullet not found word for word in the resume becomes a warning. The result is an unsaved ProfilePreview; confirmImport() saves the profile and base resume together with saveBatch().
+For each feature: what I planned in Stage 1 (shortened), a screenshot, how I built it, and what changed. The screenshots are from my demo videos.
 
-F02 (deterministic). getProfile() loads the current profile; the GUI form or profile edit flags change it. updateProfile() validates required fields, email format and date order, then JsonWorkspaceRepository.save() rejects the write if the revision changed since loading. A new revision makes older fit reports and documents stale.
+### F01 Import resume and extract profile (hybrid)
 
-F03 (hybrid). JobService.analyzeJob() limits input length, detects a deadline with detectDeadline(), and asks the model for requirements. Each requirement's sourceSpan must be an exact quote from the posting; any bad quote triggers one repair, and quotes that are still wrong are dropped with a warning. The applicant reviews the JobPreview; saveJob() stores it.
+**Stage 1 plan.** Import a PDF or TXT resume (max 5 MB). The AI pulls out the profile info, I check a preview, and then the profile and resume get saved. Bad files (wrong type, encrypted, scanned or empty) are rejected and nothing is saved.
 
-F04 (hybrid). AnalysisService.analyzeFit() sends the profile's evidence catalog and the requirements. The parser requires every requirement exactly once and checks each evidence item with EvidenceValidator.readEvidence(). Invalid evidence triggers one repair; after that, matches without valid evidence are downgraded to NOT_EVIDENCED with a warning. The FitReport records the profile and job revisions it used.
+![The preview after Import Resume. Nothing is saved until I click Save profile.](screenshots/F01.jpg){width=5.6in}
 
-F05 (hybrid). identifyGaps() reuses the current fit report, or recomputes it if it is missing or stale (isStaleFor()). It asks for one action per non-supported requirement and checks that every gap gets exactly one action with a valid type and hour estimate.
+**How I built it.** ProfileService.importResume() picks an importer based on the file type (Factory Method) and reads the text with PDFBox. The text goes to the AI, which sends back the profile as JSON. The code checks that JSON, finds the email and phone itself, and warns about any skill that isn't really in the resume. Saving happens in confirmImport().
 
-F06 (hybrid). DocumentService.tailorResume() loads the base resume and calls deepCopy() (Prototype), so edits never touch the original. The model proposes line rewrites with evidence. Each change is marked supported only if it cites valid evidence and adds no new numbers. The applicant ticks changes to keep; saveDraft() reverts unticked changes and refuses unsupported ones.
+**What changed.** Saving happens in confirmImport() instead of updateProfile(), since an import saves two new records at once. I also allowed .md files. After testing with Gemini, I added a check for missing resume sections, because one time the AI only gave back a Projects section.
 
-F07 (hybrid). draftLetter() validates the tone, sends evidence, requirements and the applicant's own motivation text, and checks each paragraph's evidence and numbers. Problems become warnings. saveDraft() refuses an unedited letter that still contains unsupported paragraphs.
+**Video:** [Part 1](https://youtu.be/Uz7fT3sWZ2U)
 
-F08 (hybrid). InterviewService.generateQuestions() checks the count (1 to 20) and focus, then requires exactly that many distinct questions, each linked to real requirement IDs.
+### F02 Review and correct profile (no AI)
 
-F09 (hybrid). startInterview() creates a session. submitAnswer() saves the answer first, then requests feedback. If the model fails, the answer stays saved with feedback pending and the session still advances; retryFeedback() fills it in later. Sessions can be paused and resumed.
+**Stage 1 plan.** Edit the profile (skills, experience, education) and save it. Bad dates or empty required fields are rejected. If the profile changed somewhere else in the meantime, the save is blocked.
 
-F10 (deterministic). ApplicationService.updateApplication() creates or updates the one record per job, parses status and dates, rejects future applied dates, and checks the revision. listApplications() filters by status and computes overdue flags and days left from the clock.
+![Profile tab after adding "Docker basics" to Skills and saving.](screenshots/F02.jpg){width=5.6in}
 
-F11 (agent). PlanService.prepareApplication() validates the time budget and starts CareerAgent.run(). Each turn the model either requests tools or gives a final JSON answer. ToolRegistry.executeTool() rejects unknown tools, bad JSON, missing arguments and IDs outside the run's scope, then binds a valid request to an InvokeToolCommand and executes it. Results are fed back as tool messages. PlanValidator checks the final plan (IDs, dependencies, cycles, minutes, deadline). The applicant saves the plan with savePlan() and any drafts separately with saveDraft().
+**How I built it.** updateProfile() checks the fields and the dates, then saves. Every save bumps a revision number, which is how the app knows older fit reports are out of date and stops two edits from overwriting each other.
 
-F12 (deterministic). ExportService.exportPackage() loads the latest reviewed documents for the job, refuses unreviewed ones, and warns about outdated or missing ones. ApplicationPackageDirector.construct() calls reset(), the add methods and build() on the chosen builder. FileExporter.write() writes into a temporary folder and renames it only when complete, and refuses existing destinations.
+**What changed.** No change. In the CLI, `career profile edit` uses flags like `--add-skill` instead of opening an editor.
+
+**Video:** [Part 1](https://youtu.be/Uz7fT3sWZ2U)
+
+### F03 Import and analyze a job (hybrid)
+
+**Stage 1 plan.** Paste or load a job posting. The AI lists the requirements, each with a quote from the posting. I review them and save. Empty input is rejected and an unknown deadline stays blank.
+
+![Review window with each requirement and its quote from the posting. The deadline was found by the code.](screenshots/F03.jpg){width=5.6in}
+
+**How I built it.** JobService.analyzeJob() finds the deadline with regular code and asks the AI for the requirements. The code checks that every quote really appears in the posting, so the AI can't make up requirements. Bad quotes get one retry and are then dropped with a warning.
+
+**What changed.** analyzeJob() returns a preview with warnings instead of just the job, so I can see if anything was dropped before saving.
+
+**Video:** [Part 1](https://youtu.be/Uz7fT3sWZ2U)
+
+### F04 Fit analysis with evidence (hybrid)
+
+**Stage 1 plan.** Compare the profile with each job requirement and mark it Supported, Partial or Not Evidenced, with the profile fact it's based on. It should not predict whether I'll get hired.
+
+![CLI output: each requirement, its status, and the profile evidence it uses.](screenshots/F04.jpg){width=5.6in}
+
+**How I built it.** AnalysisService.analyzeFit() sends the profile facts and the requirements to the AI. EvidenceValidator checks that every piece of evidence really exists in the profile. The report remembers which profile and job versions it used.
+
+**What changed.** In Stage 1, bad evidence after one retry was an error. Now only the bad evidence is removed and that requirement becomes Not Evidenced, so one mistake doesn't throw away the whole report. I also made the evidence check accept small format differences, because Gemini wrote the paths its own way.
+
+**Video:** [Part 1](https://youtu.be/Uz7fT3sWZ2U)
+
+### F05 Gaps and next steps (hybrid)
+
+**Stage 1 plan.** For requirements that aren't fully supported, suggest a next step, split into "missing evidence" and "things to learn". If the fit report is old, make a new one first. No gaps gives an empty report.
+
+![The no-gaps case. I added Docker basics in F02, so every requirement was supported.](screenshots/F05.jpg){width=5.6in}
+
+**How I built it.** identifyGaps() reuses the latest fit report or makes a new one if it's out of date. The AI suggests one action per gap, and the code checks that every gap got exactly one.
+
+**What changed.** No change.
+
+**Video:** [Part 1](https://youtu.be/Uz7fT3sWZ2U)
+
+### F06 Tailored resume version (hybrid)
+
+**Stage 1 plan.** Make a copy of the resume tailored to the job. The AI suggests changes backed by evidence, I pick which ones to keep, and the original resume never changes.
+
+![Review table with a Keep checkbox for each change. One change is unticked.](screenshots/F06.jpg){width=5.6in}
+
+**How I built it.** DocumentService.tailorResume() makes a deep copy of the resume (Prototype), so the original is safe. A change only counts as supported if its evidence is real and it doesn't add new numbers. Only the ticked changes get saved.
+
+**What changed.** Stage 1 said unsupported changes get flagged. Now they can't be kept at all, which is stricter but keeps made-up claims out of the resume.
+
+**Video:** [Part 1](https://youtu.be/Uz7fT3sWZ2U)
+
+### F07 Cover letter draft (hybrid)
+
+**Stage 1 plan.** Write a cover letter for a job with a chosen tone. Every claim about me has to come from my profile, and I review it before saving.
+
+![CLI: a bad tone is rejected, then a letter is written that passed all the checks.](screenshots/F07.jpg){width=5.6in}
+
+**How I built it.** draftLetter() checks the tone and sends my profile facts, the requirements and my own motivation to the AI. The code checks each paragraph's evidence and numbers. A letter with unsupported paragraphs can't be saved until it's fixed.
+
+**What changed.** When I tested with Gemini, the warnings weren't being shown and a true letter got blocked. Now the warnings show up, numbers can come from anywhere in my profile, and bad evidence gets one retry.
+
+**Video:** [Part 2](https://youtu.be/4y0vOQqgCr8)
+
+### F08 Interview questions (hybrid)
+
+**Stage 1 plan.** Make 1 to 20 practice questions for the job, technical or behavioural, each linked to real requirements.
+
+![Interview tab with three questions linked to requirements.](screenshots/F08.jpg){width=5.6in}
+
+**How I built it.** InterviewService.generateQuestions() checks the count, asks the AI, and makes sure it got exactly that many questions, all linked to real requirement IDs.
+
+**What changed.** Added a "mixed" focus that combines both kinds of questions.
+
+**Video:** [Part 2](https://youtu.be/4y0vOQqgCr8)
+
+### F09 Mock interview with feedback (hybrid)
+
+**Stage 1 plan.** Answer the questions one by one and get feedback. Blank answers are rejected. If the feedback fails, the answer is still saved. I can pause and come back later.
+
+![CLI: an answer with its feedback, then a blank answer being rejected and /pause.](screenshots/F09.jpg){width=5.6in}
+
+**How I built it.** submitAnswer() saves the answer first and then asks the AI for feedback. If the AI fails, the answer is marked as pending and retryFeedback() can fill it in later.
+
+**What changed.** Each answer is now stored with its own feedback and pending flag, which was needed for retries. It works the same way as planned.
+
+**Video:** [Part 2](https://youtu.be/4y0vOQqgCr8)
+
+### F10 Application tracking (no AI)
+
+**Stage 1 plan.** Keep track of each application's status, notes and deadline, and show which ones are overdue. Bad dates or statuses are rejected. I always set the status myself.
+
+![Applications tab with the Overdue only filter on. J1's deadline has passed.](screenshots/F10.jpg){width=5.6in}
+
+**How I built it.** ApplicationService.updateApplication() checks the dates and status and saves the record. listApplications() filters the list and works out overdue and days left from today's date.
+
+**What changed.** No change.
+
+**Video:** [Part 2](https://youtu.be/4y0vOQqgCr8)
+
+### F11 Application preparation agent (agent)
+
+**Stage 1 plan.** The agent decides by itself which tools to use to make a plan that fits my time. It stops at 8 tool calls or 60 seconds, asks me if it's missing info, and can't save anything. I save the plan myself.
+
+![GUI: the agent's five tool calls and the plan it made (150 of 180 minutes).](screenshots/F11-gui.jpg){width=5.6in}
+
+![Standalone CLI, same task, run from a task file. It ends with "Saved plan PL1".](screenshots/F11-cli.jpg){width=5.6in}
+
+**How I built it.** CareerAgent.run() loops: each turn the AI either asks for a tool or gives its final answer. ToolRegistry checks each tool request and runs it as a command object (Command pattern). PlanValidator checks the final plan's time and order.
+
+**What changed.** Tool names use snake_case, which is normal for AI tools. I also had to send back a "thought signature" Gemini adds to tool calls, or the agent failed. The time limit is now 180 seconds instead of 60. With the free Gemini tier the agent kept timing out, and one call hung for 156 seconds, so I also added a hard limit to each AI call. The 8 tool call limit is the same. The agent can now also be run from the standalone CLI (section 2.2).
+
+**Video:** [Part 2](https://youtu.be/4y0vOQqgCr8), [Part 3](https://youtu.be/Ty_fys1pfW8)
+
+### F12 Export application package (no AI)
+
+**Stage 1 plan.** Export the reviewed resume, cover letter and plan for a job into one folder in Markdown or text. Unreviewed documents and existing folders are refused. Nothing is sent to anyone.
+
+![CLI: the export, the folder contents, the refusal to overwrite, and the manifest.](screenshots/F12.jpg){width=5.6in}
+
+**How I built it.** ExportService.exportPackage() gets the reviewed documents. A director and a builder (Builder pattern) put the package together, and FileExporter writes it to a temp folder first and then renames it, so you never get half a package.
+
+**What changed.** reset() now gets the job, because the header needs it. Export also warns if a document was made from an older profile.
+
+**Video:** [Part 2](https://youtu.be/4y0vOQqgCr8)
+
+## 2.2 Standalone CLI (added for Stage 3)
+
+The CLI can now run a whole task from a file or from standard input without asking any questions. It uses the same facade as the GUI, so it does the exact same checks. The README has the full instructions and an example.
+
+```
+java -jar target/careerpilot.jar --llm gemini --input samples/task-prepare-application.txt
+cat samples/task-fit.txt | java -jar target/careerpilot.jar --llm gemini --json --input -
+```
+
+| Option | What it does |
+|---|---|
+| `--input FILE` (or `-` for stdin) | The task to run |
+| `--llm gemini/openai/ollama` (or `-LLMAPI`) | Which AI provider to use |
+| `--llm-model`, `--llm-base-url` | Change the model or the endpoint |
+| `--json` | Print the result as JSON, for scripts and testing |
+| `--help` | Show all options |
+
+A task file is just `key: value` lines (task, resume, job, minutes, and so on). Exit code 0 means it worked, 1 means a step failed, and 2 means the task file was wrong. The F11 CLI screenshot shows it running, and [Part 3](https://youtu.be/Ty_fys1pfW8) shows the same task in the GUI and then in the CLI.
 
 ## 3. Implemented design patterns
 
@@ -87,6 +230,15 @@ All seven Stage 1 patterns are implemented as designed. Updated class diagrams: 
 | Builder | The same selected documents must be assembled into Markdown or text without format conditions in the service | ApplicationPackageDirector (director), ApplicationPackageBuilder (builder), MarkdownPackageBuilder, TextPackageBuilder (concrete builders), ApplicationPackage (product) | export/ApplicationPackageDirector.construct() | Yes; reset() now receives the job (see 4) |
 | Command | Each validated tool request should be a self-contained object, separate from the agent loop | ToolRegistry (invoker), ToolCommand (command), InvokeToolCommand (concrete command), AgentTool implementations (receivers), CareerAgent (client) | agent/ToolRegistry.executeTool(), InvokeToolCommand.execute() | Yes |
 | Factory Method | The import workflow should not change when a file format is added | ResumeImporter (creator), PdfResumeImporter, TxtResumeImporter (concrete creators), DocumentParser (product), PdfTextParser, PlainTextParser (concrete products) | parsing/ResumeImporter.importText() calls createParser() | Yes |
+
+
+![Figure 1: Updated class diagram, application layer, facade and services](uml/A-application.png){width=6.3in}
+
+
+![Figure 2: Updated class diagram, AI layer and agent](uml/B-ai-agent.png){width=6.3in}
+
+
+![Figure 3: Updated class diagram, domain, export and parsing](uml/C-domain-export-parsing.png){width=6.3in}
 
 ## 4. Changes and rationale
 
@@ -110,12 +262,15 @@ All seven Stage 1 patterns are implemented as designed. Updated class diagrams: 
 | Evidence paths had to match exactly | EvidenceValidator.canonicalPath() maps common variations (for example profile/experience/E1/bullet/0) to the catalog form; prompts show paths as [path] text; bad letter evidence gets one repair before anything is flagged | The real model wrote paths in its own format, which blocked a truthful cover letter; invented paths are still rejected | F04, F06, F07 |
 | Letter numbers had to appear in the cited items | A number in a letter paragraph is supported if it appears anywhere in the confirmed profile, the posting, or the applicant's own motivation | A paragraph can combine several facts; requiring the exact cited item rejected true statements | F07 |
 | Agent tab controls on one row | Controls split into two rows | The Prepare Application button was cut off at normal window sizes (found while recording) | F11 GUI |
+| Agent stops at 8 calls / 60 seconds | 8 calls / 180 seconds (can be changed in .env), plus a hard time limit on each AI call | With free Gemini the agent kept timing out, and one call hung for 156 seconds | F11 |
+| Interview focus technical or behavioural | Also mixed | Real interviews have both kinds of questions | F08 |
+| Not in Stage 1 | Standalone CLI that runs a task from a file or stdin | Needed for Stage 3 testing | Main, ui/cli/LaunchOptions, TaskFile, TaskRunner |
 
 ## 5. AI tools and collaboration log
 
 | Tool / platform | Model | Used for | Tokens and cost |
 |---|---|---|---|
-| Claude (claude.ai app, agentic coding session) | Configured as claude-opus-5-5 (the app notes the model serving a turn can differ) | Generated the initial implementation of all packages, the tests, sample data, README and report drafts; diagnosed and fixed the defects I found when testing with the real model; wrote the demo video script | Tokens: not shown per conversation on the Claude Pro plan. Cost: Claude Pro subscription, $35/month as charged, no per-use charge |
+| Claude (claude.ai app, agentic coding session) | Configured as claude-opus-5-5 (the app notes the model serving a turn can differ) | Generated the initial implementation of all packages, the tests, sample data, README and report drafts; diagnosed and fixed the defects I found when testing with the real model; wrote the demo video script; built the standalone CLI and fixed the agent timeout | Tokens: not shown per conversation on the Claude Pro plan. Cost: Claude Pro subscription, $35/month as charged, no per-use charge |
 | Application runtime model | gemini-3.1-flash-lite via Gemini API free tier | Used by CareerPilot itself, not a development tool | Free tier ($0); per-call token counts are logged in workspace/logs/llm-calls.log |
 
 I did not record using any other AI development tool for Stage 2.
@@ -129,6 +284,8 @@ Representative interactions (keep the log in docs/ai-collaboration-log.md up to 
 | 2026-11-14 | First real-model test | Pasted the output of the sample flow | Fixes for the agent's HTTP 400 (thought signatures, null content, error details, retries) and missing resume sections (check, repair, rebuild) | Found both bugs by running the app with Gemini; applied and retested | 51 tests; 5 resume sections; agent PLAN_PROPOSED after 5 tool calls |
 | 2026-11-14 | Fix the blocked cover letter | Reported a truthful letter blocked with no reason, then pasted the warnings | Visible warnings, evidence-path normalization, one repair attempt | Noticed the problem, reported it, retested until the letter saved | 54 tests; all 12 features work with the real model |
 | 2026-11-15 | Record the demo videos | Asked for a video script, then reported the cut-off agent button | Two-part script; layout fix for the agent tab | Recorded both videos, noticed the hidden button, applied the fix and re-recorded part 2 | Two demo videos; fix committed |
+| 2026-11-23 | Standalone CLI for Stage 3 | Shared the instructor's announcement and asked whether everything was covered | Wrote the standalone CLI, sample task files, README section and tests | Ran it with Gemini, found the agent timed out and the stdin example failed, and sent the log showing a call stuck for 156 seconds | Timeout fixed, 66 tests, pushed |
+| 2026-11-24 | Part 3 video and report screenshots | Asked how to take a screenshot of each feature | Screenshot list; drafted section 2.1 from my Stage 1 report and the code | Recorded Part 3, took the screenshots, and asked for simpler wording | This report |
 
 Full log: docs/ai-collaboration-log.md.
 
@@ -138,17 +295,18 @@ Weekly commit summary
 
 | Period | Dates | Commits (links) |
 |---|---|---|
-| 1 | Oct 20-26 | None. No code was committed in this period. |
-| 2 | Oct 27-Nov 2 | 7 code commits: [e752680](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/e752680), [cb9a018](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/cb9a018), [f948515](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/f948515), [9a167ce](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/9a167ce), [ccf487a](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/ccf487a), [f0b42c6](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/f0b42c6), [41c0c30](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/41c0c30) |
-| 3 | Nov 3-9 | 5 code commits: [de92520](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/de92520), [dd767b5](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/dd767b5), [894a9ed](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/894a9ed), [5af2304](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/5af2304), [0a706d0](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/0a706d0) (pushed Nov 2; counted toward period 3 with the instructor's approval). Docs commit [d512006](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/d512006) |
-| After period 3 | Nov 14-15 | 7 code commits fixing defects found with the real model: [0912874](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/0912874), [7308be7](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/7308be7), [1613327](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/1613327), [a366268](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/a366268), [46f1178](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/46f1178), [e418dad](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/e418dad), [c5f5eed](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/c5f5eed) (plus docs commit [02056b8](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/02056b8)) |
+| 1 | Oct 27-Nov 2 | 7 code commits: [e752680](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/e752680), [cb9a018](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/cb9a018), [f948515](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/f948515), [9a167ce](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/9a167ce), [ccf487a](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/ccf487a), [f0b42c6](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/f0b42c6), [41c0c30](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/41c0c30) |
+| 2 | Nov 3-9 | 5 code commits: [de92520](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/de92520), [dd767b5](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/dd767b5), [894a9ed](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/894a9ed), [5af2304](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/5af2304), [0a706d0](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/0a706d0) |
+| 3 | Nov 14-15 | 7 code commits fixing defects found with the real model: [0912874](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/0912874), [7308be7](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/7308be7), [1613327](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/1613327), [a366268](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/a366268), [46f1178](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/46f1178), [e418dad](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/e418dad), [c5f5eed](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/c5f5eed) (plus docs commit [02056b8](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/02056b8)) |
+| After submission | Nov 23-24 | Standalone CLI and agent timeout fix: [848b4db](https://github.com/muhammad-kermali/EECS3311-CareerPilot/commit/848b4db); this report update |
 
 Checks performed
 
-- 54 automated tests (mvn test, all passing): repository revision conflicts, Prototype independence, plan validation (cycles, unknown dependencies, time, deadline), evidence grounding, tool registry rejections, agent loop (tool feedback, 8-call limit, single repair, NEEDS_INPUT, provider failure), adapter request/response translation against a local HTTP server (including Gemini thought signatures and Gemini error lists), logging and retrying decorators, export builders and atomic writing, and end-to-end flows through the facade with a scripted model.
+- 66 automated tests (mvn test, all passing), including tests for the standalone CLI and the timeout fix: repository revision conflicts, Prototype independence, plan validation (cycles, unknown dependencies, time, deadline), evidence grounding, tool registry rejections, agent loop (tool feedback, 8-call limit, single repair, NEEDS_INPUT, provider failure), adapter request/response translation against a local HTTP server (including Gemini thought signatures and Gemini error lists), logging and retrying decorators, export builders and atomic writing, and end-to-end flows through the facade with a scripted model.
 - Every CLI command was run end to end against a local OpenAI-compatible test server, including error paths: invalid dates, unsupported file types, AI service down, invalid quotes, invalid evidence, missing API key, stale revisions, existing export folders and the agent's scope, limit and infeasible cases.
 - The GUI was launched and every tab was exercised, including fit analysis and the agent running on a background thread.
-- I ran every feature with the real model (gemini-3.1-flash-lite) through the CLI and the GUI using the sample data, fixed the defects listed below, and retested each fix. Both demo videos were recorded on the final version.
+- I ran every feature with the real model (gemini-3.1-flash-lite) through the CLI and the GUI using the sample data, fixed the defects listed below, and retested each fix. The first two demo videos were recorded on the Stage 2 version and Part 3 on the final version.
+- I ran the standalone CLI with a task file, standard input, JSON output and some error cases, then with Gemini.
 
 Defects found and corrected
 Found by testing with the real model:
@@ -158,6 +316,8 @@ Found by testing with the real model:
 - Cover letter warnings were never shown, so a blocked letter gave no reason. CoverLetter now reports its warnings through the facade.
 - Truthful cover letter blocked because the model wrote evidence paths as profile/experience/E1/bullet/0. Added path normalization, clearer path formatting in prompts, and one repair attempt. Retested: the letter passed every check and saved.
 - Prepare Application button cut off in the agent tab at normal window sizes (found while recording). Controls now use two rows.
+- The agent timed out in the standalone CLI (Nov 23). The log showed one Gemini call that hung for 156 seconds, because Java's timeout only covered the start of the reply. Each AI call now has a hard limit and gets retried, and the agent gets 180 seconds. After the fix the agent made its plan and saved it.
+- The sample task file didn't work through standard input because of its file paths. I fixed the paths and made the "file not found" message clearer.
 
 Found earlier:
 
@@ -171,7 +331,7 @@ Remaining limitations: see section 1.
 
 ## 7. Demonstration index
 
-The demo is two videos, both public by link (YouTube, Unlisted): [Part 1](https://youtu.be/Uz7fT3sWZ2U) covers F01 to F06 and [Part 2](https://youtu.be/4y0vOQqgCr8) covers F07 to F12. Each feature is a separate segment, introduced by saying its ID and name, in the order below. Both the GUI and the CLI are shown.
+The demo is two videos, both public by link (YouTube, Unlisted): [Part 1](https://youtu.be/Uz7fT3sWZ2U) covers F01 to F06 and [Part 2](https://youtu.be/4y0vOQqgCr8) covers F07 to F12. Each feature is a separate segment, introduced by saying its ID and name, in the order below. Both the GUI and the CLI are shown. [Part 3](https://youtu.be/Ty_fys1pfW8) was added for the Stage 2 update: it does one task, preparing an application with the agent, first in the GUI and then with the standalone CLI from a task file, then shows standard input with JSON output and an invalid task file.
 
 | Feature | Video segment | Interface | Error or alternative shown |
 |---|---|---|---|
@@ -187,3 +347,4 @@ The demo is two videos, both public by link (YouTube, Unlisted): [Part 1](https:
 | F10 Application tracking | [Part 2, F10](https://youtu.be/4y0vOQqgCr8) | GUI | Overdue filter; invalid date rejected |
 | F11 Preparation agent | [Part 2, F11](https://youtu.be/4y0vOQqgCr8) | GUI | Too little time (30 minutes) |
 | F12 Export | [Part 2, F12](https://youtu.be/4y0vOQqgCr8) | CLI | Existing folder refused |
+| Same task in GUI and CLI (F11 agent) | [Part 3](https://youtu.be/Ty_fys1pfW8) | GUI, then standalone CLI | Invalid task file rejected |
